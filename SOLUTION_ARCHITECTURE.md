@@ -27,6 +27,12 @@ Tambien los finalistas y campeon del mundial.
 - Definicion de racha: 2 o mas aciertos en el dia o en una ventana de tiempo definida.
 - Opcion alternativa: cuando un usuario avanza puede desbloquear nuevos avatar que podra cambiar desde su perfil.
 
+## Referencias visuales
+
+![EWC pantalla 1](./ewc1.png)
+
+![EWC pantalla 2](./ewc2.png)
+
 ## Registro de Usuarios
 
 - Se debe importar una planilla de usuarios con email, generar el usuario y remitir un mail con el onboarding.
