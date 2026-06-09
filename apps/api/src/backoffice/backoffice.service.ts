@@ -30,7 +30,15 @@ type MatchRow = {
   away_code: string;
 };
 
-const FALLBACK_COUNTRIES = loadFallbackCountries();
+type OfficialStatusRow = {
+  id: number;
+  email: string;
+  created_at: string;
+  prediction_updated_at: string | null;
+  qualified_count: number;
+  finalist_count: number;
+  champion_code: string | null;
+};
 
 const FALLBACK_MATCHES = [
   {
@@ -170,6 +178,46 @@ export class BackofficeService {
     }));
   }
 
+  async listOfficials(adminToken?: string) {
+    this.assertAdminToken(adminToken);
+
+    const result = await this.databaseService.query<OfficialStatusRow>(
+      `
+        SELECT
+          u.id,
+          u.email,
+          u.created_at,
+          up.updated_at AS prediction_updated_at,
+          COALESCE(array_length(up.qualified_codes, 1), 0) AS qualified_count,
+          COALESCE(array_length(up.finalist_codes, 1), 0) AS finalist_count,
+          up.champion_code
+        FROM users u
+        LEFT JOIN user_predictions up ON up.user_id = u.id
+        ORDER BY u.created_at DESC;
+      `,
+    );
+
+    return result.rows.map((row) => {
+      const hasPrediction = row.champion_code != null;
+      const predictionCompleted =
+        row.qualified_count === 32 && row.finalist_count === 2 && row.champion_code != null;
+      const status = !hasPrediction ? 'pendiente' : predictionCompleted ? 'completa' : 'incompleta';
+
+      return {
+        id: row.id,
+        email: row.email,
+        createdAt: row.created_at,
+        predictionUpdatedAt: row.prediction_updated_at,
+        qualifiedCount: row.qualified_count,
+        finalistCount: row.finalist_count,
+        championCode: row.champion_code,
+        hasPrediction,
+        predictionCompleted,
+        status,
+      };
+    });
+  }
+
   async createMatch(adminToken: string | undefined, body: CreateMatchDto) {
     this.assertAdminToken(adminToken);
 
@@ -269,13 +317,14 @@ export class BackofficeService {
         matches: payload.matches?.length ?? 0,
       };
     } catch {
-      await this.replaceAllData(FALLBACK_COUNTRIES, FALLBACK_MATCHES);
+      const fallbackCountries = loadFallbackCountries();
+      await this.replaceAllData(fallbackCountries, FALLBACK_MATCHES);
 
       return {
         success: true,
         source: 'fallback',
         message: 'No se pudo importar desde API. Se cargo dataset manual de respaldo.',
-        countries: FALLBACK_COUNTRIES.length,
+        countries: fallbackCountries.length,
         matches: FALLBACK_MATCHES.length,
       };
     }

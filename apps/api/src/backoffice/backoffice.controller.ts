@@ -34,6 +34,11 @@ export class BackofficeController {
     return this.backofficeService.listMatches(adminToken);
   }
 
+  @Get('officials')
+  listOfficials(@Headers('x-admin-token') adminToken?: string) {
+    return this.backofficeService.listOfficials(adminToken);
+  }
+
   @Post('matches')
   createMatch(@Headers('x-admin-token') adminToken: string | undefined, @Body() body: CreateMatchDto) {
     return this.backofficeService.createMatch(adminToken, body);

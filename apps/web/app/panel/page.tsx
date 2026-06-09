@@ -266,57 +266,7 @@ export default function UserPanelPage() {
       </section>
 
       <form className="user-panel-grid" onSubmit={savePrediction}>
-        <section className="panel user-panel-card">
-          <h2>Clasificados a siguiente ronda</h2>
-          <p>{qualifiedCodes.length}/32 seleccionados</p>
-          <div className="country-groups">
-            {groupedCountries.map((group) => {
-              const selectedInGroup = group.teams.filter((team) => qualifiedSet.has(team.code)).length;
-
-              return (
-                <section className="group-box" key={group.groupName}>
-                  <header className="group-head">
-                    <strong>Grupo {group.groupName}</strong>
-                    <span className="group-count">{selectedInGroup}/{group.teams.length}</span>
-                  </header>
-
-                  <div className="group-country-grid">
-                    {group.teams.map((country) => {
-                      const isSelected = qualifiedSet.has(country.code);
-                      const isDisabled = !isSelected && qualifiedCodes.length >= 32;
-                      const cardClassName = [
-                        'country-item',
-                        isSelected ? 'is-selected' : '',
-                        isDisabled ? 'is-disabled' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ');
-
-                      return (
-                        <label className={cardClassName} key={country.code}>
-                          <input
-                            className="country-toggle"
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleQualified(country.code)}
-                            disabled={isDisabled}
-                          />
-                          <span>
-                            <span className="country-flag" aria-hidden="true">{getFlag(country.code)}</span>
-                            {country.name}
-                          </span>
-                          <small>{country.code}</small>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="panel user-panel-card">
+        <section className="panel user-panel-card user-panel-card-top">
           <h2>Final y campeon</h2>
           <div className="form">
             <label className="label">
@@ -368,7 +318,57 @@ export default function UserPanelPage() {
                   ))}
               </select>
             </label>
+          </div>
+        </section>
 
+        <section className="panel user-panel-card user-panel-card-bottom">
+          <h2>Clasificados a siguiente ronda</h2>
+          <p>{qualifiedCodes.length}/32 seleccionados</p>
+          <div className="country-groups">
+            {groupedCountries.map((group) => {
+              const selectedInGroup = group.teams.filter((team) => qualifiedSet.has(team.code)).length;
+
+              return (
+                <section className="group-box" key={group.groupName}>
+                  <header className="group-head">
+                    <strong>Grupo {group.groupName}</strong>
+                    <span className="group-count">{selectedInGroup}/{group.teams.length}</span>
+                  </header>
+
+                  <div className="group-country-grid">
+                    {group.teams.map((country) => {
+                      const isSelected = qualifiedSet.has(country.code);
+                      const isDisabled = !isSelected && qualifiedCodes.length >= 32;
+                      const cardClassName = [
+                        'country-item',
+                        isSelected ? 'is-selected' : '',
+                        isDisabled ? 'is-disabled' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ');
+
+                      return (
+                        <label className={cardClassName} key={country.code}>
+                          <input
+                            className="country-toggle"
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleQualified(country.code)}
+                            disabled={isDisabled}
+                          />
+                          <span className="country-flag" aria-hidden="true">{getFlag(country.code)}</span>
+                          <span className="country-name">{country.name}</span>
+                          <small className="country-code">{country.code}</small>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+
+          <div className="button-row">
             <button className="button button-primary" type="submit" disabled={busy}>
               Guardar prediccion
             </button>

@@ -29,6 +29,17 @@ function sortByName(countries: Country[]) {
   return [...countries].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function sortByGroup(countries: Country[]) {
+  return [...countries].sort((a, b) => {
+    const groupCompare = a.groupName.localeCompare(b.groupName);
+    if (groupCompare !== 0) {
+      return groupCompare;
+    }
+
+    return a.name.localeCompare(b.name);
+  });
+}
+
 export default function BackofficePage() {
   const router = useRouter();
   const [countries, setCountries] = useState<Country[]>([]);
@@ -144,6 +155,7 @@ export default function BackofficePage() {
   }
 
   const countryOptions = useMemo(() => sortByName(countries), [countries]);
+  const countriesByGroup = useMemo(() => sortByGroup(countries), [countries]);
 
   function addCountry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -304,6 +316,9 @@ export default function BackofficePage() {
           >
             Importar desde API
           </button>
+          <Link className="button button-secondary" href="/backoffice/officials">
+            Ver funcionarios
+          </Link>
           <Link className="button button-primary" href="/">
             Volver al login
           </Link>
@@ -351,7 +366,7 @@ export default function BackofficePage() {
             </button>
           </form>
 
-          <div className="table-wrap">
+          <div className="table-wrap table-wrap-y">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -362,7 +377,7 @@ export default function BackofficePage() {
                 </tr>
               </thead>
               <tbody>
-                {countryOptions.map((country) => (
+                {countriesByGroup.map((country) => (
                   <tr key={country.id}>
                     <td>{country.name}</td>
                     <td>{country.code}</td>
@@ -488,6 +503,7 @@ export default function BackofficePage() {
             </table>
           </div>
         </article>
+
       </section>
 
       <section className="panel api-ready-card">
