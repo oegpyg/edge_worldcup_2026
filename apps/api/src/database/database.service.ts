@@ -79,6 +79,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       );
     `);
 
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS user_predictions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        qualified_codes TEXT[] NOT NULL,
+        finalist_codes TEXT[] NOT NULL,
+        champion_code TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
     this.logger.log('Database schema ready');
   }
 

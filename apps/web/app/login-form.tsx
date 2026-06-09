@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const OTP_LOCK_LIMIT = 3;
@@ -81,6 +82,7 @@ function getPenaltySymbol(state: PenaltySlotState) {
 }
 
 export function LoginForm() {
+  const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>('request');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -183,6 +185,7 @@ export function LoginForm() {
 
       const payload = (await response.json()) as { token: string; user: { email: string } };
       window.localStorage.setItem('edge-worldcup-token', payload.token);
+      window.localStorage.setItem('edge-worldcup-email', payload.user.email);
       setSessionEmail(payload.user.email);
       setOtpMisses(0);
       setOtpLocked(false);
@@ -196,8 +199,7 @@ export function LoginForm() {
 
       goalTimer.current = window.setTimeout(() => {
         setShowGoal(false);
-        setAuthState('ready');
-        setStatus('Sesion iniciada. La maqueta ya quedo autenticada.');
+        router.push('/panel');
       }, 1500);
     } catch (requestError) {
       setShowGoal(false);
