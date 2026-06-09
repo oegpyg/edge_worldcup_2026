@@ -1,0 +1,61 @@
+[
+  { "name": "Argentina", "code": "ARG", "groupName": "A" },
+  { "name": "Uruguay", "code": "URU", "groupName": "A" },
+  { "name": "Japan", "code": "JPN", "groupName": "A" },
+  { "name": "Ghana", "code": "GHA", "groupName": "A" },
+
+  { "name": "Brazil", "code": "BRA", "groupName": "B" },
+  { "name": "Italy", "code": "ITA", "groupName": "B" },
+  { "name": "USA", "code": "USA", "groupName": "B" },
+  { "name": "Tunisia", "code": "TUN", "groupName": "B" },
+
+  { "name": "Mexico", "code": "MEX", "groupName": "C" },
+  { "name": "Netherlands", "code": "NED", "groupName": "C" },
+  { "name": "Senegal", "code": "SEN", "groupName": "C" },
+  { "name": "Australia", "code": "AUS", "groupName": "C" },
+
+  { "name": "Portugal", "code": "POR", "groupName": "D" },
+  { "name": "Croatia", "code": "CRO", "groupName": "D" },
+  { "name": "Canada", "code": "CAN", "groupName": "D" },
+  { "name": "Egypt", "code": "EGY", "groupName": "D" },
+
+  { "name": "France", "code": "FRA", "groupName": "E" },
+  { "name": "Colombia", "code": "COL", "groupName": "E" },
+  { "name": "South Korea", "code": "KOR", "groupName": "E" },
+  { "name": "Nigeria", "code": "NGA", "groupName": "E" },
+
+  { "name": "England", "code": "ENG", "groupName": "F" },
+  { "name": "Belgium", "code": "BEL", "groupName": "F" },
+  { "name": "Costa Rica", "code": "CRC", "groupName": "F" },
+  { "name": "Algeria", "code": "ALG", "groupName": "F" },
+
+  { "name": "Spain", "code": "ESP", "groupName": "G" },
+  { "name": "Denmark", "code": "DEN", "groupName": "G" },
+  { "name": "Ecuador", "code": "ECU", "groupName": "G" },
+  { "name": "Cameroon", "code": "CMR", "groupName": "G" },
+
+  { "name": "Germany", "code": "GER", "groupName": "H" },
+  { "name": "Switzerland", "code": "SUI", "groupName": "H" },
+  { "name": "Paraguay", "code": "PAR", "groupName": "H" },
+  { "name": "Iraq", "code": "IRQ", "groupName": "H" },
+
+  { "name": "Morocco", "code": "MAR", "groupName": "I" },
+  { "name": "Poland", "code": "POL", "groupName": "I" },
+  { "name": "Peru", "code": "PER", "groupName": "I" },
+  { "name": "Qatar", "code": "QAT", "groupName": "I" },
+
+  { "name": "Serbia", "code": "SRB", "groupName": "J" },
+  { "name": "Sweden", "code": "SWE", "groupName": "J" },
+  { "name": "Chile", "code": "CHI", "groupName": "J" },
+  { "name": "Jamaica", "code": "JAM", "groupName": "J" },
+
+  { "name": "Norway", "code": "NOR", "groupName": "K" },
+  { "name": "Iran", "code": "IRN", "groupName": "K" },
+  { "name": "Panama", "code": "PAN", "groupName": "K" },
+  { "name": "Saudi Arabia", "code": "KSA", "groupName": "K" },
+
+  { "name": "Uzbekistan", "code": "UZB", "groupName": "L" },
+  { "name": "Honduras", "code": "HON", "groupName": "L" },
+  { "name": "UAE", "code": "UAE", "groupName": "L" },
+  { "name": "Cote d'Ivoire", "code": "CIV", "groupName": "L" }
+]

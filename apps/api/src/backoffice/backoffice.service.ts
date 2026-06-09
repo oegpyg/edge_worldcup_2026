@@ -5,6 +5,8 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 import { DatabaseService } from '../database/database.service';
 import { CreateCountryDto } from './dto/create-country.dto';
@@ -28,12 +30,7 @@ type MatchRow = {
   away_code: string;
 };
 
-const FALLBACK_COUNTRIES = [
-  { name: 'Argentina', code: 'ARG', groupName: 'A' },
-  { name: 'Brazil', code: 'BRA', groupName: 'B' },
-  { name: 'Mexico', code: 'MEX', groupName: 'C' },
-  { name: 'Portugal', code: 'POR', groupName: 'D' },
-];
+const FALLBACK_COUNTRIES = loadFallbackCountries();
 
 const FALLBACK_MATCHES = [
   {
@@ -51,6 +48,12 @@ const FALLBACK_MATCHES = [
     venue: 'Estadio Azteca',
   },
 ];
+
+function loadFallbackCountries() {
+  const filePath = join(process.cwd(), 'src', 'backoffice', 'data', 'worldcup-countries.json');
+  const fileRaw = readFileSync(filePath, 'utf8');
+  return JSON.parse(fileRaw) as Array<{ name: string; code: string; groupName: string }>;
+}
 
 @Injectable()
 export class BackofficeService {
