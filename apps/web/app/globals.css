@@ -593,12 +593,58 @@ input {
   width: 100%;
 }
 
-.user-panel-card-bottom .button-row {
+.user-panel-submit {
   margin-top: 16px;
 }
 
-.user-panel-card-bottom .button-primary {
+.user-panel-submit .button-primary {
   width: 100%;
+}
+
+.readonly-summary-card {
+  padding: 22px;
+}
+
+.readonly-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.readonly-summary-item,
+.readonly-final-slot {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  display: grid;
+  gap: 6px;
+}
+
+.readonly-summary-item span,
+.readonly-final-slot span {
+  color: var(--muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.readonly-summary-item strong,
+.readonly-final-slot strong {
+  font-size: 18px;
+}
+
+.readonly-final-card {
+  width: min(560px, 100%);
+}
+
+.readonly-final-list {
+  display: grid;
+  gap: 12px;
+}
+
+.readonly-champion {
+  border-color: rgba(52, 211, 153, 0.32);
 }
 
 .user-panel-card h2 {
@@ -690,6 +736,14 @@ input {
 }
 
 .country-item.is-disabled:hover {
+  transform: none;
+}
+
+.country-item.is-readonly {
+  cursor: default;
+}
+
+.country-item.is-readonly:hover {
   transform: none;
 }
 
