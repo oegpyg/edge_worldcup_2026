@@ -134,9 +134,16 @@ export default function UserPanelPage() {
       const payload = (await response.json()) as {
         countries: Country[];
         prediction: Prediction;
+        predictionLocked: boolean;
+        predictionLockAt: string | null;
       };
 
       setCountries(payload.countries);
+      if (payload.predictionLocked) {
+        router.replace('/panel/readonly');
+        return;
+      }
+
       if (payload.prediction) {
         setQualifiedCodes(payload.prediction.qualifiedCodes);
         setFinalistCodes(payload.prediction.finalistCodes);

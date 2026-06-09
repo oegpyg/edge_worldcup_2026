@@ -40,6 +40,10 @@ type OfficialStatusRow = {
   champion_code: string | null;
 };
 
+type PredictionLockRow = {
+  setting_value: string;
+};
+
 const FALLBACK_MATCHES = [
   {
     homeCode: 'ARG',
@@ -218,6 +222,60 @@ export class BackofficeService {
     });
   }
 
+  async getPredictionLock(adminToken?: string) {
+    this.assertAdminToken(adminToken);
+
+    const lockAt = await this.readPredictionLockAt();
+    return {
+      lockAt,
+      locked: this.isPredictionLocked(lockAt),
+    };
+  }
+
+  async setPredictionLock(adminToken: string | undefined, lockAtInput?: string) {
+    this.assertAdminToken(adminToken);
+
+    const normalized = lockAtInput?.trim() ?? '';
+    if (!normalized) {
+      await this.databaseService.query(
+        `
+          DELETE FROM app_settings
+          WHERE setting_key = 'prediction_lock_at';
+        `,
+      );
+
+      return {
+        success: true,
+        lockAt: null,
+        locked: false,
+      };
+    }
+
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Fecha de cierre invalida. Usa fecha y hora validas.');
+    }
+
+    const lockAt = parsed.toISOString();
+    await this.databaseService.query(
+      `
+        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+        VALUES ('prediction_lock_at', $1, NOW())
+        ON CONFLICT (setting_key)
+        DO UPDATE SET
+          setting_value = EXCLUDED.setting_value,
+          updated_at = NOW();
+      `,
+      [lockAt],
+    );
+
+    return {
+      success: true,
+      lockAt,
+      locked: this.isPredictionLocked(lockAt),
+    };
+  }
+
   async createMatch(adminToken: string | undefined, body: CreateMatchDto) {
     this.assertAdminToken(adminToken);
 
@@ -385,5 +443,27 @@ export class BackofficeService {
     if (!adminToken || adminToken !== expected) {
       throw new UnauthorizedException('No autorizado para backoffice');
     }
+  }
+
+  private async readPredictionLockAt() {
+    const result = await this.databaseService.query<PredictionLockRow>(
+      `
+        SELECT setting_value
+        FROM app_settings
+        WHERE setting_key = 'prediction_lock_at'
+        LIMIT 1;
+      `,
+    );
+
+    return result.rows[0]?.setting_value ?? null;
+  }
+
+  private isPredictionLocked(lockAt: string | null) {
+    if (!lockAt) {
+      return false;
+    }
+
+    const parsed = new Date(lockAt);
+    return !Number.isNaN(parsed.getTime()) && parsed <= new Date();
   }
 }

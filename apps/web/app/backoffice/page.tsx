@@ -316,6 +316,9 @@ export default function BackofficePage() {
           >
             Importar desde API
           </button>
+          <Link className="button button-secondary" href="/backoffice/prediction-lock">
+            Cierre de edicion
+          </Link>
           <Link className="button button-secondary" href="/backoffice/officials">
             Ver funcionarios
           </Link>

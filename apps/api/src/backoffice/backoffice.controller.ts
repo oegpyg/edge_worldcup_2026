@@ -4,6 +4,7 @@ import { BackofficeService } from './backoffice.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { CreateCountryDto } from './dto/create-country.dto';
 import { CreateMatchDto } from './dto/create-match.dto';
+import { SetPredictionLockDto } from './dto/set-prediction-lock.dto';
 
 @Controller('backoffice')
 export class BackofficeController {
@@ -37,6 +38,19 @@ export class BackofficeController {
   @Get('officials')
   listOfficials(@Headers('x-admin-token') adminToken?: string) {
     return this.backofficeService.listOfficials(adminToken);
+  }
+
+  @Get('prediction-lock')
+  getPredictionLock(@Headers('x-admin-token') adminToken?: string) {
+    return this.backofficeService.getPredictionLock(adminToken);
+  }
+
+  @Post('prediction-lock')
+  setPredictionLock(
+    @Headers('x-admin-token') adminToken: string | undefined,
+    @Body() body: SetPredictionLockDto,
+  ) {
+    return this.backofficeService.setPredictionLock(adminToken, body.lockAt);
   }
 
   @Post('matches')

@@ -128,6 +128,8 @@ export default function UserPanelReadonlyPage() {
       const payload = (await response.json()) as {
         countries: Country[];
         prediction: Prediction;
+        predictionLocked: boolean;
+        predictionLockAt: string | null;
       };
 
       setCountries(payload.countries);
@@ -138,6 +140,8 @@ export default function UserPanelReadonlyPage() {
         if (savedFromQuery) {
           setNotice('Prediccion guardada correctamente.');
         }
+      } else if (payload.predictionLocked) {
+        setNotice('La fecha de cierre ya paso. Esta vista es solo lectura.');
       } else {
         router.replace('/panel');
       }

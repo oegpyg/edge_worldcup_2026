@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 
 import { DatabaseService } from '../database/database.service';
 import { SavePredictionDto } from './dto/save-prediction.dto';
@@ -20,12 +20,18 @@ type PredictionRow = {
   champion_code: string;
 };
 
+type PredictionLockRow = {
+  setting_value: string;
+};
+
 @Injectable()
 export class UserService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   async getPanelData(sessionToken: string | undefined) {
     const user = await this.getSessionUser(sessionToken);
+    const predictionLockAt = await this.getPredictionLockAt();
+    const predictionLocked = this.isPredictionLocked(predictionLockAt);
     const countries = await this.databaseService.query<CountryRow>(
       `
         SELECT code, name, group_name
@@ -46,6 +52,8 @@ export class UserService {
 
     return {
       userEmail: user.email,
+      predictionLocked,
+      predictionLockAt,
       countries: countries.rows.map((row) => ({
         code: row.code,
         name: row.name,
@@ -64,6 +72,11 @@ export class UserService {
 
   async savePrediction(sessionToken: string | undefined, body: SavePredictionDto) {
     const user = await this.getSessionUser(sessionToken);
+    const predictionLockAt = await this.getPredictionLockAt();
+
+    if (this.isPredictionLocked(predictionLockAt)) {
+      throw new ForbiddenException('La fecha de cierre ya vencio. No se puede editar la prediccion.');
+    }
 
     const qualified = body.qualifiedCodes.map((code) => code.toUpperCase());
     const finalists = body.finalistCodes.map((code) => code.toUpperCase());
@@ -141,5 +154,27 @@ export class UserService {
     }
 
     return user;
+  }
+
+  private async getPredictionLockAt() {
+    const result = await this.databaseService.query<PredictionLockRow>(
+      `
+        SELECT setting_value
+        FROM app_settings
+        WHERE setting_key = 'prediction_lock_at'
+        LIMIT 1;
+      `,
+    );
+
+    return result.rows[0]?.setting_value ?? null;
+  }
+
+  private isPredictionLocked(lockAt: string | null) {
+    if (!lockAt) {
+      return false;
+    }
+
+    const parsed = new Date(lockAt);
+    return !Number.isNaN(parsed.getTime()) && parsed <= new Date();
   }
 }
