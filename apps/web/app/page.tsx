@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { LoginForm } from './login-form';
 
 export default function HomePage() {
@@ -55,6 +57,12 @@ export default function HomePage() {
         </section>
 
         <LoginForm />
+      </div>
+
+      <div style={{ marginTop: 14, width: 'min(1180px, 100%)', display: 'flex', justifyContent: 'flex-end' }}>
+        <Link className="button button-secondary" href="/dashboard">
+          Ver dashboard de puntos
+        </Link>
       </div>
     </main>
   );

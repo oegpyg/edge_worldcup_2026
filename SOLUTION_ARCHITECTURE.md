@@ -26,6 +26,81 @@ Tambien los finalistas y campeon del mundial.
 - El usuario puede desbloquear mejoras visuales del avatar cuando mantiene racha.
 - Definicion de racha: 2 o mas aciertos en el dia o en una ventana de tiempo definida.
 - Opcion alternativa: cuando un usuario avanza puede desbloquear nuevos avatar que podra cambiar desde su perfil.
+ 
+🩸 SISTEMA DE RACHAS – “PURETE COMBAT MODE”
+
+🟤 0–1 | “Desconectado”
+
+* Aún no entras en partida real
+* UI: apagado / sin animación
+
+⸻
+
+⚔️ 2–3 | “Warm Up”
+
+* Estás midiendo el lobby
+* UI: leve vibración + gris metálico
+
+⸻
+
+🧠 4–6 | “Predator Instinct”
+
+* Ya estás leyendo el juego
+* UI: mirada / scan / sonido leve de tensión
+
+⸻
+
+🔥 7–9 | “Combo Starter”
+
+* Empiezas a encadenar aciertos
+* UI: efectos de hit + partículas rojas
+
+⸻
+
+💀 10–12 | “NO MERCY”
+
+* Aquí empieza la presión real
+* UI: rojo intenso + shake al sumar puntos
+
+⸻
+
+⚡ 13–15 | “FATAL STRIKE”
+
+* Momentum peligroso, estás rompiendo el juego
+* UI: glitch + flashes + sonido agresivo
+
+⸻
+
+🩸 16–18 | “BRUTALITY MODE”
+
+* Inspiración MK directa
+* UI: sangre digital / distortion / freeze frames
+
+⸻
+
+👑 19–22 | “EXECUTIONER”
+
+* No solo ganas, ejecutas rivales
+* UI: negro + dorado + efecto de “finisher”
+
+⸻
+
+☠️ 23+ | “WORLD DOMINATION”
+
+* Estado jefe final del dashboard
+* UI: corona oscura + fuego + animación épica constante
+
+# !Cuando te equivocas de seguido, racha de errores :
+
+•⁠  ⁠🤡 “Clown Mode Activated”
+•⁠  ⁠💔 “Choke Artist”
+•⁠  ⁠🎯 “Almost Legendary”
+•⁠  ⁠🫠 “Pressure Folded You”
+•⁠  ⁠🎮 “Lag In Brain”
+•⁠  ⁠🧃 “Juice Drained”
+•⁠  ⁠🪦 “Racha Funeral”
+•⁠  ⁠🧠 “Misclick Supreme”
+
 
 ## Referencias visuales
 

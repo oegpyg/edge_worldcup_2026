@@ -117,6 +117,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       );
     `);
 
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS premium_avatar_claims (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        premium_avatar_key TEXT NOT NULL UNIQUE,
+        claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
     this.logger.log('Database schema ready');
   }
 
