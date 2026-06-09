@@ -44,6 +44,10 @@ type PredictionLockRow = {
   setting_value: string;
 };
 
+type CountryCodeRow = {
+  code: string;
+};
+
 const FALLBACK_MATCHES = [
   {
     homeCode: 'ARG',
@@ -276,6 +280,91 @@ export class BackofficeService {
     };
   }
 
+  async generateDemoPredictions(adminToken: string | undefined, count = 50) {
+    this.assertAdminToken(adminToken);
+
+    const demoCount = Math.min(Math.max(Math.trunc(count || 50), 1), 200);
+    const countriesResult = await this.databaseService.query<CountryCodeRow>(
+      `
+        SELECT code
+        FROM wc_countries
+        ORDER BY code ASC;
+      `,
+    );
+
+    if (countriesResult.rows.length < 32) {
+      throw new BadRequestException('No hay suficientes paises cargados para simular predicciones.');
+    }
+
+    const countries = countriesResult.rows.map((row) => row.code);
+    const demoPrefix = 'demo-%@edgeworldcup.local';
+
+    await this.databaseService.query('BEGIN;');
+
+    try {
+      await this.databaseService.query(
+        `
+          DELETE FROM user_predictions
+          WHERE user_id IN (
+            SELECT id
+            FROM users
+            WHERE email LIKE 'demo-%@edgeworldcup.local'
+          );
+        `,
+      );
+
+      await this.databaseService.query(
+        `
+          DELETE FROM users
+          WHERE email LIKE 'demo-%@edgeworldcup.local';
+        `,
+      );
+
+      for (let index = 1; index <= demoCount; index += 1) {
+        const email = `demo-${String(index).padStart(2, '0')}@edgeworldcup.local`;
+        const userResult = await this.databaseService.query<{ id: number }>(
+          `
+            INSERT INTO users (email)
+            VALUES ($1)
+            RETURNING id;
+          `,
+          [email],
+        );
+
+        const qualifiedCodes = this.pickRandomCodes(countries, 32);
+        const finalistCodes = this.pickRandomCodes(qualifiedCodes, 2);
+        const championCode = finalistCodes[0] ?? qualifiedCodes[0];
+
+        await this.databaseService.query(
+          `
+            INSERT INTO user_predictions (user_id, qualified_codes, finalist_codes, champion_code)
+            VALUES ($1, $2::text[], $3::text[], $4)
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+              qualified_codes = EXCLUDED.qualified_codes,
+              finalist_codes = EXCLUDED.finalist_codes,
+              champion_code = EXCLUDED.champion_code,
+              updated_at = NOW();
+          `,
+          [userResult.rows[0].id, qualifiedCodes, finalistCodes, championCode],
+        );
+      }
+
+      await this.databaseService.query('COMMIT;');
+
+      return {
+        success: true,
+        createdUsers: demoCount,
+        predictions: demoCount,
+        prefix: demoPrefix,
+        message: 'Predicciones demo cargadas.',
+      };
+    } catch (error) {
+      await this.databaseService.query('ROLLBACK;');
+      throw error;
+    }
+  }
+
   async createMatch(adminToken: string | undefined, body: CreateMatchDto) {
     this.assertAdminToken(adminToken);
 
@@ -465,5 +554,16 @@ export class BackofficeService {
 
     const parsed = new Date(lockAt);
     return !Number.isNaN(parsed.getTime()) && parsed <= new Date();
+  }
+
+  private pickRandomCodes(codes: string[], count: number) {
+    const shuffled = [...codes];
+
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+
+    return shuffled.slice(0, count);
   }
 }
