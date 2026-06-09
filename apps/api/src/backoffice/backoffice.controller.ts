@@ -1,0 +1,51 @@
+import { Body, Controller, Delete, Get, Headers, Param, ParseIntPipe, Post } from '@nestjs/common';
+
+import { BackofficeService } from './backoffice.service';
+import { AdminLoginDto } from './dto/admin-login.dto';
+import { CreateCountryDto } from './dto/create-country.dto';
+import { CreateMatchDto } from './dto/create-match.dto';
+
+@Controller('backoffice')
+export class BackofficeController {
+  constructor(private readonly backofficeService: BackofficeService) {}
+
+  @Post('auth/login')
+  adminLogin(@Body() body: AdminLoginDto) {
+    return this.backofficeService.adminLogin(body.username, body.password);
+  }
+
+  @Get('countries')
+  listCountries(@Headers('x-admin-token') adminToken?: string) {
+    return this.backofficeService.listCountries(adminToken);
+  }
+
+  @Post('countries')
+  createCountry(@Headers('x-admin-token') adminToken: string | undefined, @Body() body: CreateCountryDto) {
+    return this.backofficeService.createCountry(adminToken, body);
+  }
+
+  @Delete('countries/:id')
+  deleteCountry(@Headers('x-admin-token') adminToken: string | undefined, @Param('id', ParseIntPipe) id: number) {
+    return this.backofficeService.deleteCountry(adminToken, id);
+  }
+
+  @Get('matches')
+  listMatches(@Headers('x-admin-token') adminToken?: string) {
+    return this.backofficeService.listMatches(adminToken);
+  }
+
+  @Post('matches')
+  createMatch(@Headers('x-admin-token') adminToken: string | undefined, @Body() body: CreateMatchDto) {
+    return this.backofficeService.createMatch(adminToken, body);
+  }
+
+  @Delete('matches/:id')
+  deleteMatch(@Headers('x-admin-token') adminToken: string | undefined, @Param('id', ParseIntPipe) id: number) {
+    return this.backofficeService.deleteMatch(adminToken, id);
+  }
+
+  @Post('import')
+  importFromApi(@Headers('x-admin-token') adminToken?: string) {
+    return this.backofficeService.importFromApiWithFallback(adminToken);
+  }
+}

@@ -149,6 +149,18 @@ Variables de entorno en `docker-compose.yml` (editar segun necesidad):
 **CORS:**
 - `FRONTEND_ORIGIN`: http://localhost:3000
 
+**Backoffice admin:**
+- `BACKOFFICE_ADMIN_USER`: usuario del panel admin
+- `BACKOFFICE_ADMIN_PASSWORD`: password del panel admin
+- `BACKOFFICE_ADMIN_TOKEN`: token interno para proteger endpoints `/backoffice/*`
+- `WORLDCUP_IMPORT_URL`: endpoint externo para importar paises/partidos (si falla, se usa fallback)
+
+### Login del backoffice
+
+- URL: `http://localhost:3000/backoffice/login`
+- Si no hay token admin valido, `http://localhost:3000/backoffice` redirige automaticamente a login.
+- El token se obtiene en `POST /backoffice/auth/login` y se guarda en frontend para consumir endpoints admin.
+
 ## Visuales de la Maqueta
 
 La pantalla inicial muestra:

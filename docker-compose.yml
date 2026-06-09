@@ -34,6 +34,10 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: no-reply@edgeworldcup.local
+      BACKOFFICE_ADMIN_USER: admin
+      BACKOFFICE_ADMIN_PASSWORD: admin1234
+      BACKOFFICE_ADMIN_TOKEN: edge-backoffice-dev-token
+      WORLDCUP_IMPORT_URL: ""
     depends_on:
       - postgres
       - mailpit

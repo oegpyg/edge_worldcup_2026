@@ -2,182 +2,276 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type Country = {
-  id: string;
+  id: number;
   name: string;
   code: string;
-  group: string;
+  groupName: string;
 };
 
 type MatchItem = {
-  id: string;
+  id: number;
   home: string;
+  homeCode: string;
   away: string;
+  awayCode: string;
   kickoff: string;
   stage: string;
   venue: string;
 };
 
-const STORAGE_KEY = 'edge-worldcup-backoffice-v1';
-
-const seedCountries: Country[] = [
-  { id: crypto.randomUUID(), name: 'Argentina', code: 'ARG', group: 'A' },
-  { id: crypto.randomUUID(), name: 'Brazil', code: 'BRA', group: 'B' },
-  { id: crypto.randomUUID(), name: 'Mexico', code: 'MEX', group: 'C' },
-  { id: crypto.randomUUID(), name: 'Portugal', code: 'POR', group: 'D' },
-];
-
-const seedMatches: MatchItem[] = [
-  {
-    id: crypto.randomUUID(),
-    home: 'Argentina',
-    away: 'Portugal',
-    kickoff: '2026-06-21T18:00',
-    stage: 'Grupos',
-    venue: 'MetLife Stadium',
-  },
-  {
-    id: crypto.randomUUID(),
-    home: 'Mexico',
-    away: 'Brazil',
-    kickoff: '2026-06-22T20:00',
-    stage: 'Grupos',
-    venue: 'Estadio Azteca',
-  },
-];
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+const ADMIN_TOKEN_KEY = 'edge-backoffice-admin-token';
 
 function sortByName(countries: Country[]) {
   return [...countries].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export default function BackofficePage() {
+  const router = useRouter();
   const [countries, setCountries] = useState<Country[]>([]);
   const [matches, setMatches] = useState<MatchItem[]>([]);
   const [countryName, setCountryName] = useState('');
   const [countryCode, setCountryCode] = useState('');
   const [countryGroup, setCountryGroup] = useState('A');
-  const [home, setHome] = useState('');
-  const [away, setAway] = useState('');
+  const [homeCode, setHomeCode] = useState('');
+  const [awayCode, setAwayCode] = useState('');
   const [kickoff, setKickoff] = useState('');
   const [stage, setStage] = useState('Grupos');
   const [venue, setVenue] = useState('');
   const [notice, setNotice] = useState('');
+  const [isBusy, setIsBusy] = useState(false);
+  const [adminToken, setAdminToken] = useState('');
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        setCountries(sortByName(seedCountries));
-        setMatches(seedMatches);
-        return;
-      }
-
-      const parsed = JSON.parse(raw) as { countries?: Country[]; matches?: MatchItem[] };
-      setCountries(sortByName(parsed.countries ?? []));
-      setMatches(parsed.matches ?? []);
-    } catch {
-      setCountries(sortByName(seedCountries));
-      setMatches(seedMatches);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (countries.length === 0 && matches.length === 0) {
+    const token = window.localStorage.getItem(ADMIN_TOKEN_KEY);
+    if (!token) {
+      router.replace('/backoffice/login');
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ countries, matches }));
-  }, [countries, matches]);
+    setAdminToken(token);
+    void loadData(token);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function loadData(token?: string) {
+    const activeToken = token ?? adminToken;
+    if (!activeToken) {
+      return;
+    }
+
+    try {
+      setIsBusy(true);
+      const [countriesResponse, matchesResponse] = await Promise.all([
+        fetch(`${API_URL}/backoffice/countries`, {
+          headers: { 'x-admin-token': activeToken },
+        }),
+        fetch(`${API_URL}/backoffice/matches`, {
+          headers: { 'x-admin-token': activeToken },
+        }),
+      ]);
+
+      if (!countriesResponse.ok || !matchesResponse.ok) {
+        if (countriesResponse.status === 401 || matchesResponse.status === 401) {
+          window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+          router.replace('/backoffice/login');
+          return;
+        }
+
+        throw new Error('No se pudo cargar backoffice desde API');
+      }
+
+      const [countriesPayload, matchesPayload] = (await Promise.all([
+        countriesResponse.json(),
+        matchesResponse.json(),
+      ])) as [Country[], MatchItem[]];
+
+      setCountries(sortByName(countriesPayload));
+      setMatches(matchesPayload);
+    } catch {
+      setNotice('No se pudo conectar al backend. Revisa API en localhost:4000.');
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function importFromApiWithFallback() {
+    if (!adminToken) {
+      return;
+    }
+
+    try {
+      setIsBusy(true);
+      const response = await fetch(`${API_URL}/backoffice/import`, {
+        method: 'POST',
+        headers: { 'x-admin-token': adminToken },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+          router.replace('/backoffice/login');
+          return;
+        }
+
+        throw new Error('Import no disponible');
+      }
+
+      const payload = (await response.json()) as {
+        source: 'api' | 'fallback';
+        message?: string;
+        countries: number;
+        matches: number;
+      };
+
+      await loadData(adminToken);
+      if (payload.source === 'api') {
+        setNotice(`Import API OK: ${payload.countries} paises y ${payload.matches} partidos.`);
+      } else {
+        setNotice(
+          payload.message ??
+            `Import API fallo, se activo fallback manual: ${payload.countries} paises y ${payload.matches} partidos.`,
+        );
+      }
+    } catch {
+      setNotice('Import API fallo. Continua carga manual en backoffice.');
+    } finally {
+      setIsBusy(false);
+    }
+  }
 
   const countryOptions = useMemo(() => sortByName(countries), [countries]);
 
   function addCountry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const normalizedName = countryName.trim();
-    const normalizedCode = countryCode.trim().toUpperCase();
+    void (async () => {
+      const normalizedName = countryName.trim();
+      const normalizedCode = countryCode.trim().toUpperCase();
 
-    if (!normalizedName || normalizedCode.length !== 3) {
-      setNotice('Completa pais y codigo ISO de 3 letras.');
-      return;
-    }
+      if (!normalizedName || normalizedCode.length !== 3) {
+        setNotice('Completa pais y codigo ISO de 3 letras.');
+        return;
+      }
 
-    if (countries.some((item) => item.code === normalizedCode || item.name === normalizedName)) {
-      setNotice('Ese pais ya existe en la lista.');
-      return;
-    }
+      try {
+        setIsBusy(true);
+        const response = await fetch(`${API_URL}/backoffice/countries`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-token': adminToken,
+          },
+          body: JSON.stringify({
+            name: normalizedName,
+            code: normalizedCode,
+            groupName: countryGroup,
+          }),
+        });
 
-    setCountries((current) =>
-      sortByName([
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          name: normalizedName,
-          code: normalizedCode,
-          group: countryGroup,
-        },
-      ]),
-    );
-    setCountryName('');
-    setCountryCode('');
-    setCountryGroup('A');
-    setNotice('Pais agregado al backoffice.');
+        if (!response.ok) {
+          throw new Error('Error creando pais');
+        }
+
+        const created = (await response.json()) as Country;
+        setCountries((current) => sortByName([...current, created]));
+        setCountryName('');
+        setCountryCode('');
+        setCountryGroup('A');
+        setNotice('Pais agregado en PostgreSQL.');
+      } catch {
+        setNotice('No se pudo crear pais. Verifica duplicados.');
+      } finally {
+        setIsBusy(false);
+      }
+    })();
   }
 
   function addMatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    void (async () => {
+      if (!homeCode || !awayCode || !kickoff || !venue.trim()) {
+        setNotice('Completa local, visita, fecha y estadio.');
+        return;
+      }
 
-    if (!home || !away || !kickoff || !venue.trim()) {
-      setNotice('Completa local, visita, fecha y estadio.');
-      return;
-    }
+      if (homeCode === awayCode) {
+        setNotice('Local y visita no pueden ser el mismo pais.');
+        return;
+      }
 
-    if (home === away) {
-      setNotice('Local y visita no pueden ser el mismo pais.');
-      return;
-    }
+      try {
+        setIsBusy(true);
+        const response = await fetch(`${API_URL}/backoffice/matches`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-token': adminToken,
+          },
+          body: JSON.stringify({
+            homeCode,
+            awayCode,
+            kickoff: new Date(kickoff).toISOString(),
+            stage,
+            venue: venue.trim(),
+          }),
+        });
 
-    setMatches((current) => [
-      {
-        id: crypto.randomUUID(),
-        home,
-        away,
-        kickoff,
-        stage,
-        venue: venue.trim(),
-      },
-      ...current,
-    ]);
-    setHome('');
-    setAway('');
-    setKickoff('');
-    setStage('Grupos');
-    setVenue('');
-    setNotice('Partido agregado al calendario.');
+        if (!response.ok) {
+          throw new Error('Error creando partido');
+        }
+
+        await loadData(adminToken);
+        setHomeCode('');
+        setAwayCode('');
+        setKickoff('');
+        setStage('Grupos');
+        setVenue('');
+        setNotice('Partido agregado en PostgreSQL.');
+      } catch {
+        setNotice('No se pudo crear partido. Revisa paises/fecha.');
+      } finally {
+        setIsBusy(false);
+      }
+    })();
   }
 
-  function deleteCountry(id: string) {
-    const target = countries.find((item) => item.id === id);
-    if (!target) {
-      return;
-    }
-
-    setCountries((current) => current.filter((item) => item.id !== id));
-    setMatches((current) =>
-      current.filter((item) => item.home !== target.name && item.away !== target.name),
-    );
-    setNotice('Pais eliminado. Partidos asociados removidos.');
+  function deleteCountry(id: number) {
+    void (async () => {
+      try {
+        setIsBusy(true);
+        await fetch(`${API_URL}/backoffice/countries/${id}`, {
+          method: 'DELETE',
+          headers: { 'x-admin-token': adminToken },
+        });
+        await loadData(adminToken);
+        setNotice('Pais eliminado.');
+      } catch {
+        setNotice('No se pudo eliminar pais.');
+      } finally {
+        setIsBusy(false);
+      }
+    })();
   }
 
-  function deleteMatch(id: string) {
-    setMatches((current) => current.filter((item) => item.id !== id));
-    setNotice('Partido eliminado.');
-  }
-
-  function seedFromApiFallback() {
-    setCountries(sortByName(seedCountries));
-    setMatches(seedMatches);
-    setNotice('Datos demo cargados (fallback manual si falla API externa).');
+  function deleteMatch(id: number) {
+    void (async () => {
+      try {
+        setIsBusy(true);
+        await fetch(`${API_URL}/backoffice/matches/${id}`, {
+          method: 'DELETE',
+          headers: { 'x-admin-token': adminToken },
+        });
+        await loadData(adminToken);
+        setNotice('Partido eliminado.');
+      } catch {
+        setNotice('No se pudo eliminar partido.');
+      } finally {
+        setIsBusy(false);
+      }
+    })();
   }
 
   return (
@@ -187,13 +281,28 @@ export default function BackofficePage() {
           <span className="eyebrow">Admin Panel</span>
           <h1>Backoffice Mundial 2026</h1>
           <p>
-            Carga manual de paises y partidos para no depender 100% de API externa. Luego se puede
-            reemplazar por import automatico.
+            Gestiona paises y partidos en PostgreSQL. Puedes importar desde API externa y si falla,
+            el sistema cae automaticamente al fallback manual.
           </p>
         </div>
         <div className="backoffice-actions">
-          <button className="button button-secondary" type="button" onClick={seedFromApiFallback}>
-            Cargar datos demo
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => {
+              window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+              router.push('/backoffice/login');
+            }}
+          >
+            Cerrar admin
+          </button>
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={importFromApiWithFallback}
+            disabled={isBusy}
+          >
+            Importar desde API
           </button>
           <Link className="button button-primary" href="/">
             Volver al login
@@ -257,7 +366,7 @@ export default function BackofficePage() {
                   <tr key={country.id}>
                     <td>{country.name}</td>
                     <td>{country.code}</td>
-                    <td>{country.group}</td>
+                    <td>{country.groupName}</td>
                     <td>
                       <button className="mini-button" type="button" onClick={() => deleteCountry(country.id)}>
                         Quitar
@@ -276,22 +385,32 @@ export default function BackofficePage() {
             <div className="inline-fields two-col">
               <label className="label">
                 Local
-                <select className="input" value={home} onChange={(event) => setHome(event.target.value)} required>
+                <select
+                  className="input"
+                  value={homeCode}
+                  onChange={(event) => setHomeCode(event.target.value)}
+                  required
+                >
                   <option value="">Selecciona</option>
                   {countryOptions.map((country) => (
-                    <option value={country.name} key={`home-${country.id}`}>
-                      {country.name}
+                    <option value={country.code} key={`home-${country.id}`}>
+                      {country.name} ({country.code})
                     </option>
                   ))}
                 </select>
               </label>
               <label className="label">
                 Visita
-                <select className="input" value={away} onChange={(event) => setAway(event.target.value)} required>
+                <select
+                  className="input"
+                  value={awayCode}
+                  onChange={(event) => setAwayCode(event.target.value)}
+                  required
+                >
                   <option value="">Selecciona</option>
                   {countryOptions.map((country) => (
-                    <option value={country.name} key={`away-${country.id}`}>
-                      {country.name}
+                    <option value={country.code} key={`away-${country.id}`}>
+                      {country.name} ({country.code})
                     </option>
                   ))}
                 </select>
@@ -374,8 +493,8 @@ export default function BackofficePage() {
       <section className="panel api-ready-card">
         <h3>Preparado para API externa</h3>
         <p>
-          Esta seccion ya funciona como fallback manual. En una segunda fase podemos conectar API
-          Football y reemplazar la carga manual por import automatico.
+          Si `WORLDCUP_IMPORT_URL` responde bien, se importa desde API. Si falla, el backend carga
+          dataset fallback y el backoffice sigue operando en manual sin romper flujo.
         </p>
       </section>
 

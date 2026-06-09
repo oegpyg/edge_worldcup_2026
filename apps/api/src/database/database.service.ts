@@ -56,6 +56,29 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       );
     `);
 
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS wc_countries (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        code TEXT NOT NULL UNIQUE,
+        group_name TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS wc_matches (
+        id SERIAL PRIMARY KEY,
+        home_country_id INTEGER NOT NULL REFERENCES wc_countries(id) ON DELETE CASCADE,
+        away_country_id INTEGER NOT NULL REFERENCES wc_countries(id) ON DELETE CASCADE,
+        kickoff TIMESTAMPTZ NOT NULL,
+        stage TEXT NOT NULL,
+        venue TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CHECK (home_country_id <> away_country_id)
+      );
+    `);
+
     this.logger.log('Database schema ready');
   }
 
