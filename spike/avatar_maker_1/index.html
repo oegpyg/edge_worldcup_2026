@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Human Avatar Maker</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Human Avatar Maker</h1>
+        <div class="avatar-editor">
+            <div class="controls">
+                <fieldset class="control-group">
+                    <legend>Skin tone</legend>
+                    <input type="radio" id="skin-tone1" name="skin-tone" checked>
+                    <label for="skin-tone1" class="swatch skin-tone1"></label>
+                    <input type="radio" id="skin-tone2" name="skin-tone">
+                    <label for="skin-tone2" class="swatch skin-tone2"></label>
+                    <input type="radio" id="skin-tone3" name="skin-tone">
+                    <label for="skin-tone3" class="swatch skin-tone3"></label>
+                    <input type="radio" id="skin-tone4" name="skin-tone">
+                    <label for="skin-tone4" class="swatch skin-tone4"></label>
+                </fieldset>
+
+                <fieldset class="control-group">
+                    <legend>Eye size</legend>
+                    <input type="radio" id="eye-size1" name="eye-size">
+                    <label for="eye-size1" class="step">1</label>
+                    <input type="radio" id="eye-size2" name="eye-size">
+                    <label for="eye-size2" class="step">2</label>
+                    <input type="radio" id="eye-size3" name="eye-size" checked>
+                    <label for="eye-size3" class="step">3</label>
+                    <input type="radio" id="eye-size4" name="eye-size">
+                    <label for="eye-size4" class="step">4</label>
+                    <input type="radio" id="eye-size5" name="eye-size">
+                    <label for="eye-size5" class="step">5</label>
+                </fieldset>
+
+                <fieldset class="control-group">
+                    <legend>Eye color</legend>
+                    <input type="radio" id="eye-color1" name="eye-color" checked>
+                    <label for="eye-color1" class="swatch eye-color1"></label>
+                    <input type="radio" id="eye-color2" name="eye-color">
+                    <label for="eye-color2" class="swatch eye-color2"></label>
+                    <input type="radio" id="eye-color3" name="eye-color">
+                    <label for="eye-color3" class="swatch eye-color3"></label>
+                    <input type="radio" id="eye-color4" name="eye-color">
+                    <label for="eye-color4" class="swatch eye-color4"></label>
+                </fieldset>
+
+                <fieldset class="control-group">
+                    <legend>Hair</legend>
+                    <input type="radio" id="hair-style1" name="hair-style">
+                    <label for="hair-style1" class="step">1</label>
+                    <input type="radio" id="hair-style2" name="hair-style" checked>
+                    <label for="hair-style2" class="step">2</label>
+                    <input type="radio" id="hair-style3" name="hair-style">
+                    <label for="hair-style3" class="step">3</label>
+                    <input type="radio" id="hair-style4" name="hair-style">
+                    <label for="hair-style4" class="step">4</label>
+                    <input type="radio" id="hair-style5" name="hair-style">
+                    <label for="hair-style5" class="step">5</label>
+                </fieldset>
+
+                <fieldset class="control-group">
+                    <legend>Eyebrows</legend>
+                    <input type="radio" id="brow-style1" name="brow-style">
+                    <label for="brow-style1" class="step">1</label>
+                    <input type="radio" id="brow-style2" name="brow-style" checked>
+                    <label for="brow-style2" class="step">2</label>
+                    <input type="radio" id="brow-style3" name="brow-style">
+                    <label for="brow-style3" class="step">3</label>
+                    <input type="radio" id="brow-style4" name="brow-style">
+                    <label for="brow-style4" class="step">4</label>
+                    <input type="radio" id="brow-style5" name="brow-style">
+                    <label for="brow-style5" class="step">5</label>
+                </fieldset>
+
+                <fieldset class="control-group">
+                    <legend>Nose</legend>
+                    <input type="radio" id="nose-size1" name="nose-size">
+                    <label for="nose-size1" class="step">1</label>
+                    <input type="radio" id="nose-size2" name="nose-size">
+                    <label for="nose-size2" class="step">2</label>
+                    <input type="radio" id="nose-size3" name="nose-size" checked>
+                    <label for="nose-size3" class="step">3</label>
+                    <input type="radio" id="nose-size4" name="nose-size">
+                    <label for="nose-size4" class="step">4</label>
+                    <input type="radio" id="nose-size5" name="nose-size">
+                    <label for="nose-size5" class="step">5</label>
+                </fieldset>
+
+                <fieldset class="control-group">
+                    <legend>Mouth</legend>
+                    <input type="radio" id="mouth-style1" name="mouth-style">
+                    <label for="mouth-style1" class="step">1</label>
+                    <input type="radio" id="mouth-style2" name="mouth-style">
+                    <label for="mouth-style2" class="step">2</label>
+                    <input type="radio" id="mouth-style3" name="mouth-style" checked>
+                    <label for="mouth-style3" class="step">3</label>
+                    <input type="radio" id="mouth-style4" name="mouth-style">
+                    <label for="mouth-style4" class="step">4</label>
+                    <input type="radio" id="mouth-style5" name="mouth-style">
+                    <label for="mouth-style5" class="step">5</label>
+                </fieldset>
+
+                <fieldset class="control-group">
+                    <legend>Beard</legend>
+                    <input type="radio" id="beard-style1" name="beard-style">
+                    <label for="beard-style1" class="step">1</label>
+                    <input type="radio" id="beard-style2" name="beard-style" checked>
+                    <label for="beard-style2" class="step">2</label>
+                    <input type="radio" id="beard-style3" name="beard-style">
+                    <label for="beard-style3" class="step">3</label>
+                    <input type="radio" id="beard-style4" name="beard-style">
+                    <label for="beard-style4" class="step">4</label>
+                    <input type="radio" id="beard-style5" name="beard-style">
+                    <label for="beard-style5" class="step">5</label>
+                </fieldset>
+            </div>
+
+            <div class="avatar-preview">
+                <div class="avatar" role="img" aria-label="Custom human avatar preview">
+                    <div class="hair"></div>
+                    <div class="head"></div>
+                    <div class="eyebrow left"></div>
+                    <div class="eyebrow right"></div>
+                    <div class="eye left"></div>
+                    <div class="eye right"></div>
+                    <div class="nose"></div>
+                    <div class="mouth"></div>
+                    <div class="beard"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
