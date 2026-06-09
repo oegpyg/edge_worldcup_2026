@@ -28,6 +28,8 @@ type MatchRow = {
   home_code: string;
   away_name: string;
   away_code: string;
+  home_score: number | null;
+  away_score: number | null;
 };
 
 type OfficialStatusRow = {
@@ -35,8 +37,8 @@ type OfficialStatusRow = {
   email: string;
   created_at: string;
   prediction_updated_at: string | null;
-  qualified_count: number;
-  finalist_count: number;
+  qualified_codes: string[] | null;
+  finalist_codes: string[] | null;
   champion_code: string | null;
 };
 
@@ -46,6 +48,19 @@ type PredictionLockRow = {
 
 type CountryCodeRow = {
   code: string;
+};
+
+type MatchResultRow = {
+  home_code: string;
+  away_code: string;
+  home_score: number | null;
+  away_score: number | null;
+};
+
+type CompetitionSnapshot = {
+  qualifiers: Set<string>;
+  finalists: Set<string>;
+  champion: string | null;
 };
 
 const FALLBACK_MATCHES = [
@@ -163,6 +178,8 @@ export class BackofficeService {
           m.kickoff,
           m.stage,
           m.venue,
+          m.home_score,
+          m.away_score,
           hc.name AS home_name,
           hc.code AS home_code,
           ac.name AS away_name,
@@ -183,11 +200,15 @@ export class BackofficeService {
       kickoff: row.kickoff,
       stage: row.stage,
       venue: row.venue,
+      homeScore: row.home_score,
+      awayScore: row.away_score,
     }));
   }
 
   async listOfficials(adminToken?: string) {
     this.assertAdminToken(adminToken);
+
+    const snapshot = await this.getCompetitionSnapshot();
 
     const result = await this.databaseService.query<OfficialStatusRow>(
       `
@@ -196,8 +217,8 @@ export class BackofficeService {
           u.email,
           u.created_at,
           up.updated_at AS prediction_updated_at,
-          COALESCE(array_length(up.qualified_codes, 1), 0) AS qualified_count,
-          COALESCE(array_length(up.finalist_codes, 1), 0) AS finalist_count,
+          up.qualified_codes,
+          up.finalist_codes,
           up.champion_code
         FROM users u
         LEFT JOIN user_predictions up ON up.user_id = u.id
@@ -206,19 +227,23 @@ export class BackofficeService {
     );
 
     return result.rows.map((row) => {
-      const hasPrediction = row.champion_code != null;
+      const qualifiedCodes = row.qualified_codes ?? [];
+      const finalistCodes = row.finalist_codes ?? [];
+      const hasPrediction = qualifiedCodes.length > 0 || finalistCodes.length > 0 || row.champion_code != null;
       const predictionCompleted =
-        row.qualified_count === 32 && row.finalist_count === 2 && row.champion_code != null;
+        qualifiedCodes.length === 32 && finalistCodes.length === 2 && row.champion_code != null;
       const status = !hasPrediction ? 'pendiente' : predictionCompleted ? 'completa' : 'incompleta';
+      const points = this.calculatePoints(qualifiedCodes, finalistCodes, row.champion_code, snapshot);
 
       return {
         id: row.id,
         email: row.email,
         createdAt: row.created_at,
         predictionUpdatedAt: row.prediction_updated_at,
-        qualifiedCount: row.qualified_count,
-        finalistCount: row.finalist_count,
+        qualifiedCount: qualifiedCodes.length,
+        finalistCount: finalistCodes.length,
         championCode: row.champion_code,
+        points,
         hasPrediction,
         predictionCompleted,
         status,
@@ -363,6 +388,86 @@ export class BackofficeService {
       await this.databaseService.query('ROLLBACK;');
       throw error;
     }
+  }
+
+  async generateDemoMatches(adminToken: string | undefined, count = 10) {
+    this.assertAdminToken(adminToken);
+
+    const demoCount = Math.min(Math.max(Math.trunc(count || 10), 1), 50);
+    const matchesResult = await this.databaseService.query<{ id: number }>(
+      `
+        SELECT id
+        FROM wc_matches
+        WHERE home_score IS NULL OR away_score IS NULL
+        ORDER BY kickoff ASC, id ASC
+        LIMIT $1;
+      `,
+      [demoCount],
+    );
+
+    const selectedMatchIds = new Set(matchesResult.rows.map((row) => row.id));
+
+    if (selectedMatchIds.size < demoCount) {
+      const countriesResult = await this.databaseService.query<CountryCodeRow>(
+        `
+          SELECT code
+          FROM wc_countries
+          ORDER BY code ASC;
+        `,
+      );
+
+      if (countriesResult.rows.length < 2) {
+        throw new BadRequestException('No hay suficientes paises cargados para simular partidos.');
+      }
+
+      const countryCodes = countriesResult.rows.map((row) => row.code);
+      const existingDemoCount = selectedMatchIds.size;
+
+      for (let index = existingDemoCount; index < demoCount; index += 1) {
+        const [homeCode, awayCode] = this.pickTwoDistinctCodes(countryCodes);
+        const kickoff = new Date(Date.now() + index * 60 * 60 * 1000).toISOString();
+        const venue = `Demo Stadium ${index + 1}`;
+        const homeResult = await this.databaseService.query<{ id: number }>(
+          `
+            INSERT INTO wc_matches (home_country_id, away_country_id, kickoff, stage, venue)
+            SELECT hc.id, ac.id, $3::timestamptz, 'Demo', $4
+            FROM wc_countries hc, wc_countries ac
+            WHERE hc.code = $1 AND ac.code = $2
+            RETURNING id;
+          `,
+          [homeCode, awayCode, kickoff, venue],
+        );
+        selectedMatchIds.add(homeResult.rows[0].id);
+      }
+    }
+
+    let updated = 0;
+
+    for (const match of Array.from(selectedMatchIds)) {
+      const homeScore = Math.floor(Math.random() * 5);
+      let awayScore = Math.floor(Math.random() * 5);
+      if (awayScore === homeScore) {
+        awayScore = (awayScore + 1) % 5;
+      }
+
+      await this.databaseService.query(
+        `
+          UPDATE wc_matches
+          SET home_score = $2,
+              away_score = $3,
+              result_updated_at = NOW()
+          WHERE id = $1;
+        `,
+        [match, homeScore, awayScore],
+      );
+      updated += 1;
+    }
+
+    return {
+      success: true,
+      updatedMatches: updated,
+      message: 'Partidos demo actualizados.',
+    };
   }
 
   async createMatch(adminToken: string | undefined, body: CreateMatchDto) {
@@ -565,5 +670,82 @@ export class BackofficeService {
     }
 
     return shuffled.slice(0, count);
+  }
+
+  private async getCompetitionSnapshot() {
+    const result = await this.databaseService.query<MatchResultRow>(
+      `
+        SELECT
+          hc.code AS home_code,
+          ac.code AS away_code,
+          m.home_score,
+          m.away_score
+        FROM wc_matches m
+        JOIN wc_countries hc ON hc.id = m.home_country_id
+        JOIN wc_countries ac ON ac.id = m.away_country_id
+        WHERE m.home_score IS NOT NULL
+          AND m.away_score IS NOT NULL;
+      `,
+    );
+
+    const teamPoints = new Map<string, number>();
+
+    for (const row of result.rows) {
+      const homeScore = Number(row.home_score ?? 0);
+      const awayScore = Number(row.away_score ?? 0);
+      const homePoints = teamPoints.get(row.home_code) ?? 0;
+      const awayPoints = teamPoints.get(row.away_code) ?? 0;
+
+      if (homeScore > awayScore) {
+        teamPoints.set(row.home_code, homePoints + 3);
+        teamPoints.set(row.away_code, awayPoints);
+      } else if (awayScore > homeScore) {
+        teamPoints.set(row.home_code, homePoints);
+        teamPoints.set(row.away_code, awayPoints + 3);
+      } else {
+        teamPoints.set(row.home_code, homePoints + 1);
+        teamPoints.set(row.away_code, awayPoints + 1);
+      }
+    }
+
+    const ranked = Array.from(teamPoints.entries())
+      .sort((entryA, entryB) => {
+        if (entryB[1] !== entryA[1]) {
+          return entryB[1] - entryA[1];
+        }
+
+        return entryA[0].localeCompare(entryB[0]);
+      })
+      .map(([code]) => code);
+
+    return {
+      qualifiers: new Set(ranked.slice(0, 32)),
+      finalists: new Set(ranked.slice(0, 2)),
+      champion: ranked[0] ?? null,
+    };
+  }
+
+  private calculatePoints(
+    qualifiedCodes: string[],
+    finalistCodes: string[],
+    championCode: string | null,
+    snapshot: CompetitionSnapshot,
+  ) {
+    const qualifiedPoints = qualifiedCodes.filter((code) => snapshot.qualifiers.has(code)).length;
+    const finalistPoints = finalistCodes.filter((code) => snapshot.finalists.has(code)).length;
+    const championPoints = championCode && snapshot.champion === championCode ? 1 : 0;
+
+    return qualifiedPoints + finalistPoints + championPoints;
+  }
+
+  private pickTwoDistinctCodes(codes: string[]) {
+    const shuffled = [...codes];
+
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+
+    return [shuffled[0], shuffled[1]] as const;
   }
 }

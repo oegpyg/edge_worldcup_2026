@@ -12,6 +12,7 @@ type OfficialStatus = {
   qualifiedCount: number;
   finalistCount: number;
   championCode: string | null;
+  points: number;
   hasPrediction: boolean;
   predictionCompleted: boolean;
   status: 'pendiente' | 'incompleta' | 'completa';
@@ -109,6 +110,7 @@ export default function BackofficeOfficialsPage() {
               <tr>
                 <th>Funcionario</th>
                 <th>Estado</th>
+                <th>Puntos</th>
                 <th>Progreso</th>
                 <th>Campeon</th>
                 <th>Ultima actualizacion</th>
@@ -124,6 +126,7 @@ export default function BackofficeOfficialsPage() {
                   <td>
                     <span className={`status-chip status-chip-${official.status}`}>{official.status}</span>
                   </td>
+                  <td>{official.points}</td>
                   <td>
                     {official.qualifiedCount}/32 clasificados · {official.finalistCount}/2 finalistas
                   </td>

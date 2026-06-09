@@ -74,9 +74,27 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         kickoff TIMESTAMPTZ NOT NULL,
         stage TEXT NOT NULL,
         venue TEXT NOT NULL,
+        home_score INTEGER,
+        away_score INTEGER,
+        result_updated_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         CHECK (home_country_id <> away_country_id)
       );
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE wc_matches
+      ADD COLUMN IF NOT EXISTS home_score INTEGER;
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE wc_matches
+      ADD COLUMN IF NOT EXISTS away_score INTEGER;
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE wc_matches
+      ADD COLUMN IF NOT EXISTS result_updated_at TIMESTAMPTZ;
     `);
 
     await this.pool.query(`

@@ -322,6 +322,9 @@ export default function BackofficePage() {
           <Link className="button button-secondary" href="/backoffice/demo-predictions">
             Predicciones demo
           </Link>
+          <Link className="button button-secondary" href="/backoffice/demo-matches">
+            Partidos demo
+          </Link>
           <Link className="button button-secondary" href="/backoffice/officials">
             Ver funcionarios
           </Link>

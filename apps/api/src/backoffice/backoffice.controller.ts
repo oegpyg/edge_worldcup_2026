@@ -4,6 +4,7 @@ import { BackofficeService } from './backoffice.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { CreateCountryDto } from './dto/create-country.dto';
 import { CreateMatchDto } from './dto/create-match.dto';
+import { GenerateDemoMatchesDto } from './dto/generate-demo-matches.dto';
 import { GenerateDemoPredictionsDto } from './dto/generate-demo-predictions.dto';
 import { SetPredictionLockDto } from './dto/set-prediction-lock.dto';
 
@@ -60,6 +61,14 @@ export class BackofficeController {
     @Body() body: GenerateDemoPredictionsDto,
   ) {
     return this.backofficeService.generateDemoPredictions(adminToken, body.count);
+  }
+
+  @Post('demo-matches')
+  generateDemoMatches(
+    @Headers('x-admin-token') adminToken: string | undefined,
+    @Body() body: GenerateDemoMatchesDto,
+  ) {
+    return this.backofficeService.generateDemoMatches(adminToken, body.count);
   }
 
   @Post('matches')
