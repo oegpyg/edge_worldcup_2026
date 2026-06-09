@@ -5,7 +5,7 @@ import { DatabaseService } from './database/database.service';
 type LeaderboardPredictionRow = {
   id: number;
   email: string;
-  prediction_updated_at: string | null;
+  prediction_updated_at: string | Date | null;
   qualified_codes: string[] | null;
   finalist_codes: string[] | null;
   champion_code: string | null;
@@ -256,7 +256,7 @@ export class AppController {
   }
 
   private async assignPremiumAvatars(
-    entries: Array<{ id: number; points: number; predictionUpdatedAt: string | null }>,
+    entries: Array<{ id: number; points: number; predictionUpdatedAt: string | Date | null }>,
   ) {
     const claimMap = await this.readPremiumClaimMap();
     const usedKeys = new Set(Array.from(claimMap.values()));
@@ -269,11 +269,15 @@ export class AppController {
     const eligible = entries
       .filter((entry) => entry.points >= PREMIUM_THRESHOLD && !claimMap.has(entry.id))
       .sort((entryA, entryB) => {
-        const aTime = entryA.predictionUpdatedAt ?? '9999-12-31T23:59:59.000Z';
-        const bTime = entryB.predictionUpdatedAt ?? '9999-12-31T23:59:59.000Z';
+        const aTime = entryA.predictionUpdatedAt
+          ? new Date(entryA.predictionUpdatedAt).getTime()
+          : Number.POSITIVE_INFINITY;
+        const bTime = entryB.predictionUpdatedAt
+          ? new Date(entryB.predictionUpdatedAt).getTime()
+          : Number.POSITIVE_INFINITY;
 
         if (aTime !== bTime) {
-          return aTime.localeCompare(bTime);
+          return aTime - bTime;
         }
 
         return entryA.id - entryB.id;

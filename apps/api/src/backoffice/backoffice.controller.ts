@@ -4,6 +4,8 @@ import { BackofficeService } from './backoffice.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { CreateCountryDto } from './dto/create-country.dto';
 import { CreateMatchDto } from './dto/create-match.dto';
+import { DemoDistributionDto } from './dto/demo-distribution.dto';
+import { DemoResetDto } from './dto/demo-reset.dto';
 import { GenerateDemoMatchesDto } from './dto/generate-demo-matches.dto';
 import { GenerateDemoPredictionsDto } from './dto/generate-demo-predictions.dto';
 import { SetPredictionLockDto } from './dto/set-prediction-lock.dto';
@@ -69,6 +71,22 @@ export class BackofficeController {
     @Body() body: GenerateDemoMatchesDto,
   ) {
     return this.backofficeService.generateDemoMatches(adminToken, body.count);
+  }
+
+  @Post('demo-reset')
+  resetDemoSimulation(
+    @Headers('x-admin-token') adminToken: string | undefined,
+    @Body() body: DemoResetDto,
+  ) {
+    return this.backofficeService.resetDemoSimulation(adminToken, body);
+  }
+
+  @Post('demo-distribution')
+  generateDemoDistribution(
+    @Headers('x-admin-token') adminToken: string | undefined,
+    @Body() body: DemoDistributionDto,
+  ) {
+    return this.backofficeService.generateDemoDistribution(adminToken, body.wave);
   }
 
   @Post('matches')

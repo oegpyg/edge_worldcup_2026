@@ -50,6 +50,11 @@ type CountryCodeRow = {
   code: string;
 };
 
+type DemoUserRow = {
+  id: number;
+  email: string;
+};
+
 type MatchResultRow = {
   home_code: string;
   away_code: string;
@@ -79,6 +84,9 @@ const FALLBACK_MATCHES = [
     venue: 'Estadio Azteca',
   },
 ];
+
+const MAX_PREDICTION_POINTS = 35;
+const PREMIUM_START_POINTS = 25;
 
 function loadFallbackCountries() {
   const filePath = join(process.cwd(), 'src', 'backoffice', 'data', 'worldcup-countries.json');
@@ -470,6 +478,118 @@ export class BackofficeService {
     };
   }
 
+  async resetDemoSimulation(
+    adminToken: string | undefined,
+    options?: { clearMatchResults?: boolean; clearPremiumClaims?: boolean },
+  ) {
+    this.assertAdminToken(adminToken);
+
+    const clearMatchResults = options?.clearMatchResults ?? true;
+    const clearPremiumClaims = options?.clearPremiumClaims ?? true;
+
+    if (clearMatchResults) {
+      await this.databaseService.query(
+        `
+          UPDATE wc_matches
+          SET home_score = NULL,
+              away_score = NULL,
+              result_updated_at = NULL;
+        `,
+      );
+    }
+
+    if (clearPremiumClaims) {
+      await this.databaseService.query('DELETE FROM premium_avatar_claims;');
+    }
+
+    return {
+      success: true,
+      clearMatchResults,
+      clearPremiumClaims,
+      message: 'Simulacion limpiada. Puedes arrancar nuevas olas.',
+    };
+  }
+
+  async generateDemoDistribution(adminToken: string | undefined, wave = 1) {
+    this.assertAdminToken(adminToken);
+
+    const normalizedWave = Math.min(Math.max(Math.trunc(wave || 1), 1), 4);
+
+    await this.generateDemoMatches(adminToken, 50);
+
+    let snapshot = await this.getCompetitionSnapshot();
+    if (snapshot.qualifiers.size < 32 || !snapshot.champion) {
+      await this.generateDemoMatches(adminToken, 50);
+      snapshot = await this.getCompetitionSnapshot();
+    }
+
+    const countriesResult = await this.databaseService.query<CountryCodeRow>(
+      `
+        SELECT code
+        FROM wc_countries
+        ORDER BY code ASC;
+      `,
+    );
+
+    const allCodes = countriesResult.rows.map((row) => row.code);
+    if (allCodes.length < 40) {
+      throw new BadRequestException('No hay suficientes paises para distribuir aciertos demo.');
+    }
+
+    const usersResult = await this.databaseService.query<DemoUserRow>(
+      `
+        SELECT id, email
+        FROM users
+        WHERE email LIKE 'demo-%@edgeworldcup.local'
+        ORDER BY id ASC;
+      `,
+    );
+
+    if (usersResult.rows.length === 0) {
+      throw new BadRequestException('No hay usuarios demo. Primero genera predicciones demo.');
+    }
+
+    const premiumSlotsByWave = [0, 2, 5, 10];
+    const premiumSlots = premiumSlotsByWave[normalizedWave - 1] ?? 0;
+
+    await this.databaseService.query('BEGIN;');
+
+    try {
+      for (let index = 0; index < usersResult.rows.length; index += 1) {
+        const user = usersResult.rows[index];
+        const targetPoints = this.resolveWaveTargetPoints(index, premiumSlots);
+        const prediction = this.buildPredictionForTargetPoints(allCodes, snapshot, targetPoints);
+
+        await this.databaseService.query(
+          `
+            INSERT INTO user_predictions (user_id, qualified_codes, finalist_codes, champion_code)
+            VALUES ($1, $2::text[], $3::text[], $4)
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+              qualified_codes = EXCLUDED.qualified_codes,
+              finalist_codes = EXCLUDED.finalist_codes,
+              champion_code = EXCLUDED.champion_code,
+              updated_at = NOW();
+          `,
+          [user.id, prediction.qualifiedCodes, prediction.finalistCodes, prediction.championCode],
+        );
+      }
+
+      await this.databaseService.query('COMMIT;');
+    } catch (error) {
+      await this.databaseService.query('ROLLBACK;');
+      throw error;
+    }
+
+    return {
+      success: true,
+      wave: normalizedWave,
+      premiumCandidates: premiumSlots,
+      usersUpdated: usersResult.rows.length,
+      message: `Distribucion demo aplicada. Wave ${normalizedWave} lista.`,
+    };
+  }
+
   async createMatch(adminToken: string | undefined, body: CreateMatchDto) {
     this.assertAdminToken(adminToken);
 
@@ -670,6 +790,80 @@ export class BackofficeService {
     }
 
     return shuffled.slice(0, count);
+  }
+
+  private resolveWaveTargetPoints(index: number, premiumSlots: number) {
+    if (index < premiumSlots) {
+      const highTargets = [25, 26, 27, 28, 29, 30, 31, 28, 27, 26];
+      return highTargets[index % highTargets.length];
+    }
+
+    const distributedTargets = [5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 24, 20, 18, 16, 14, 12, 10, 8, 6, 22];
+    return distributedTargets[index % distributedTargets.length];
+  }
+
+  private buildPredictionForTargetPoints(
+    allCodes: string[],
+    snapshot: CompetitionSnapshot,
+    targetPointsRaw: number,
+  ) {
+    const targetPoints = Math.min(Math.max(targetPointsRaw, 0), MAX_PREDICTION_POINTS);
+    const qualifiers = this.pickRandomCodes(Array.from(snapshot.qualifiers), 32);
+    const nonQualifiers = allCodes.filter((code) => !snapshot.qualifiers.has(code));
+    const finalists = Array.from(snapshot.finalists);
+    const champion = snapshot.champion;
+
+    if (!champion || finalists.length < 2 || nonQualifiers.length < 8) {
+      throw new BadRequestException('Snapshot insuficiente para distribuir aciertos. Simula mas partidos.');
+    }
+
+    let championHit = 0;
+    let finalistHits = 0;
+    let qualifierHits = 0;
+
+    if (targetPoints >= PREMIUM_START_POINTS) {
+      championHit = 1;
+      finalistHits = 2;
+      qualifierHits = targetPoints - 3;
+    } else if (targetPoints >= 15) {
+      championHit = 0;
+      finalistHits = 1;
+      qualifierHits = targetPoints - 1;
+    } else {
+      championHit = 0;
+      finalistHits = 0;
+      qualifierHits = targetPoints;
+    }
+
+    qualifierHits = Math.min(Math.max(qualifierHits, finalistHits), 32);
+
+    const correctFinalists = finalists.slice(0, finalistHits);
+    const requiredCorrect = new Set(correctFinalists);
+    const extraCorrectNeeded = Math.max(0, qualifierHits - requiredCorrect.size);
+    const extraCorrect = qualifiers.filter((code) => !requiredCorrect.has(code)).slice(0, extraCorrectNeeded);
+    const correctQualified = [...requiredCorrect, ...extraCorrect];
+
+    const wrongQualifiedNeeded = 32 - correctQualified.length;
+    const wrongQualified = this.pickRandomCodes(nonQualifiers, wrongQualifiedNeeded);
+    const qualifiedCodes = this.pickRandomCodes([...correctQualified, ...wrongQualified], 32);
+
+    const wrongFinalistCandidates = qualifiedCodes.filter((code) => !snapshot.finalists.has(code));
+    const wrongFinalists = this.pickRandomCodes(wrongFinalistCandidates, Math.max(0, 2 - finalistHits));
+    const finalistCodes = this.pickRandomCodes([...correctFinalists, ...wrongFinalists], 2);
+
+    let championCode = finalistCodes.find((code) => code !== champion) ?? finalistCodes[0];
+    if (championHit === 1) {
+      if (!finalistCodes.includes(champion)) {
+        finalistCodes[0] = champion;
+      }
+      championCode = champion;
+    }
+
+    return {
+      qualifiedCodes,
+      finalistCodes,
+      championCode,
+    };
   }
 
   private async getCompetitionSnapshot() {
