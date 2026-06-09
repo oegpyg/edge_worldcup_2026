@@ -13,6 +13,57 @@ type Country = {
   groupName: string;
 };
 
+const FLAG_BY_CODE: Record<string, string> = {
+  ARG: '🇦🇷',
+  URU: '🇺🇾',
+  JPN: '🇯🇵',
+  GHA: '🇬🇭',
+  BRA: '🇧🇷',
+  ITA: '🇮🇹',
+  USA: '🇺🇸',
+  TUN: '🇹🇳',
+  MEX: '🇲🇽',
+  NED: '🇳🇱',
+  SEN: '🇸🇳',
+  AUS: '🇦🇺',
+  POR: '🇵🇹',
+  CRO: '🇭🇷',
+  CAN: '🇨🇦',
+  EGY: '🇪🇬',
+  FRA: '🇫🇷',
+  COL: '🇨🇴',
+  KOR: '🇰🇷',
+  NGA: '🇳🇬',
+  ENG: '🏴',
+  BEL: '🇧🇪',
+  CRC: '🇨🇷',
+  ALG: '🇩🇿',
+  ESP: '🇪🇸',
+  DEN: '🇩🇰',
+  ECU: '🇪🇨',
+  CMR: '🇨🇲',
+  GER: '🇩🇪',
+  SUI: '🇨🇭',
+  PAR: '🇵🇾',
+  IRQ: '🇮🇶',
+  MAR: '🇲🇦',
+  POL: '🇵🇱',
+  PER: '🇵🇪',
+  QAT: '🇶🇦',
+  SRB: '🇷🇸',
+  SWE: '🇸🇪',
+  CHI: '🇨🇱',
+  JAM: '🇯🇲',
+  NOR: '🇳🇴',
+  IRN: '🇮🇷',
+  PAN: '🇵🇦',
+  KSA: '🇸🇦',
+  UZB: '🇺🇿',
+  HON: '🇭🇳',
+  UAE: '🇦🇪',
+  CIV: '🇨🇮',
+};
+
 type Prediction = {
   qualifiedCodes: string[];
   finalistCodes: string[];
@@ -47,6 +98,27 @@ export default function UserPanelPage() {
     () => countries.filter((country) => qualifiedSet.has(country.code)),
     [countries, qualifiedSet],
   );
+
+  const groupedCountries = useMemo(() => {
+    const groups = new Map<string, Country[]>();
+
+    for (const country of countries) {
+      const current = groups.get(country.groupName) ?? [];
+      current.push(country);
+      groups.set(country.groupName, current);
+    }
+
+    return Array.from(groups.entries())
+      .sort(([groupA], [groupB]) => groupA.localeCompare(groupB))
+      .map(([groupName, teams]) => ({
+        groupName,
+        teams: teams.sort((a, b) => a.name.localeCompare(b.name)),
+      }));
+  }, [countries]);
+
+  function getFlag(code: string) {
+    return FLAG_BY_CODE[code] ?? '🏳️';
+  }
 
   async function loadPanel(token: string) {
     try {
@@ -197,19 +269,50 @@ export default function UserPanelPage() {
         <section className="panel user-panel-card">
           <h2>Clasificados a siguiente ronda</h2>
           <p>{qualifiedCodes.length}/32 seleccionados</p>
-          <div className="country-grid">
-            {countries.map((country) => (
-              <label className="country-item" key={country.code}>
-                <input
-                  type="checkbox"
-                  checked={qualifiedSet.has(country.code)}
-                  onChange={() => toggleQualified(country.code)}
-                  disabled={!qualifiedSet.has(country.code) && qualifiedCodes.length >= 32}
-                />
-                <span>{country.name}</span>
-                <small>{country.code} - Grupo {country.groupName}</small>
-              </label>
-            ))}
+          <div className="country-groups">
+            {groupedCountries.map((group) => {
+              const selectedInGroup = group.teams.filter((team) => qualifiedSet.has(team.code)).length;
+
+              return (
+                <section className="group-box" key={group.groupName}>
+                  <header className="group-head">
+                    <strong>Grupo {group.groupName}</strong>
+                    <span className="group-count">{selectedInGroup}/{group.teams.length}</span>
+                  </header>
+
+                  <div className="group-country-grid">
+                    {group.teams.map((country) => {
+                      const isSelected = qualifiedSet.has(country.code);
+                      const isDisabled = !isSelected && qualifiedCodes.length >= 32;
+                      const cardClassName = [
+                        'country-item',
+                        isSelected ? 'is-selected' : '',
+                        isDisabled ? 'is-disabled' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ');
+
+                      return (
+                        <label className={cardClassName} key={country.code}>
+                          <input
+                            className="country-toggle"
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleQualified(country.code)}
+                            disabled={isDisabled}
+                          />
+                          <span>
+                            <span className="country-flag" aria-hidden="true">{getFlag(country.code)}</span>
+                            {country.name}
+                          </span>
+                          <small>{country.code}</small>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         </section>
 
@@ -226,7 +329,7 @@ export default function UserPanelPage() {
                 <option value="">Selecciona</option>
                 {finalistOptions.map((country) => (
                   <option key={`f1-${country.code}`} value={country.code}>
-                    {country.name} ({country.code})
+                    {getFlag(country.code)} {country.name} ({country.code})
                   </option>
                 ))}
               </select>
@@ -242,7 +345,7 @@ export default function UserPanelPage() {
                 <option value="">Selecciona</option>
                 {finalistOptions.map((country) => (
                   <option key={`f2-${country.code}`} value={country.code}>
-                    {country.name} ({country.code})
+                    {getFlag(country.code)} {country.name} ({country.code})
                   </option>
                 ))}
               </select>
@@ -260,7 +363,7 @@ export default function UserPanelPage() {
                   .filter((country) => finalistCodes.includes(country.code))
                   .map((country) => (
                     <option key={`champ-${country.code}`} value={country.code}>
-                      {country.name} ({country.code})
+                      {getFlag(country.code)} {country.name} ({country.code})
                     </option>
                   ))}
               </select>
