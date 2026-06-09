@@ -146,6 +146,8 @@ export default function DashboardPage() {
   }, []);
 
   const leaders = board?.leaders ?? [];
+  const topTen = leaders.slice(0, 10);
+  const others = leaders.slice(10);
   const unlocks = useMemo(() => {
     const levels = [0, 2, 3, 4, 5];
     return levels.map((level, index) => {
@@ -219,7 +221,7 @@ export default function DashboardPage() {
         {error && <div className="status error">{error}</div>}
 
         <div className="race-list">
-          {leaders.map((leader) => {
+          {topTen.map((leader) => {
             const tone = laneTone(leader.rank);
             const style = {
               '--progress': `${leader.progress}%`,
@@ -258,6 +260,29 @@ export default function DashboardPage() {
             );
           })}
         </div>
+
+        {others.length > 0 && (
+          <section className="race-rest">
+            <div className="race-rest-head">
+              <h2>Todos los participantes</h2>
+              <p>{others.length} participantes mas en formato compacto.</p>
+            </div>
+
+            <div className="race-rest-list">
+              {others.map((leader) => (
+                <article className="race-rest-row" key={leader.id}>
+                  <div className="race-rest-rank">#{leader.rank}</div>
+                  <img className="race-avatar race-avatar-small" src={leader.avatarImage} alt={`Avatar ${leader.name}`} />
+                  <div className="race-rest-runner">
+                    <strong>{leader.name}</strong>
+                    <span>{leader.streakLabel}</span>
+                  </div>
+                  <div className="race-rest-points">{leader.points} pts</div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
       </section>
 
       <section className="panel race-unlocks">

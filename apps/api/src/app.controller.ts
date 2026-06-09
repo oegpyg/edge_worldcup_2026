@@ -238,7 +238,6 @@ export class AppController {
           isPremium: premiumKey != null,
         };
       })
-      .slice(0, 12)
       .map((entry, index) => ({
         ...entry,
         rank: index + 1,
