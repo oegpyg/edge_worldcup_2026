@@ -158,6 +158,26 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       ADD COLUMN IF NOT EXISTS fail_avatar_key TEXT;
     `);
 
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS otp_security_events (
+        id SERIAL PRIMARY KEY,
+        user_email TEXT NOT NULL,
+        ip_address TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_otp_security_events_email_event_created
+      ON otp_security_events (user_email, event_type, created_at DESC);
+    `);
+
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_otp_security_events_ip_event_created
+      ON otp_security_events (ip_address, event_type, created_at DESC);
+    `);
+
     this.logger.log('Database schema ready');
   }
 

@@ -170,10 +170,19 @@ Variables de entorno en `.env.dev` o `.env.prod` (editar segun necesidad):
 
 **OTP:**
 - `OTP_TTL_MINUTES`: 10 (vencimiento del codigo)
+- `OTP_HASH_SECRET`: secreto para firmar hash OTP con HMAC
+- `OTP_LOCK_MINUTES`: minutos de bloqueo tras maximo de intentos fallidos
+- `OTP_REQUEST_COOLDOWN_SECONDS`: cooldown entre requests OTP por email
+- `OTP_REQUEST_MAX_PER_EMAIL_PER_HOUR`: limite de requests OTP por email/hora
+- `OTP_REQUEST_MAX_PER_IP_PER_HOUR`: limite de requests OTP por IP/hora
+- `OTP_VERIFY_MAX_PER_IP_PER_10MIN`: limite de verify OTP por IP en 10 minutos
 
 **SMTP:**
-- `SMTP_HOST`: mailpit (localhost en desarrollo)
-- `SMTP_PORT`: 1025
+- `SMTP_HOST`: host SMTP real (mailpit en desarrollo)
+- `SMTP_PORT`: puerto SMTP
+- `SMTP_SECURE`: true/false segun proveedor (465 normalmente true)
+- `SMTP_USER`: usuario SMTP (si aplica)
+- `SMTP_PASSWORD`: password/token SMTP (si aplica)
 - `SMTP_FROM`: no-reply@edgeworldcup.local
 
 **CORS:**
@@ -246,6 +255,13 @@ docker compose down -v
 - Next.js 15.5.19 esta sin vulnerabilidades conocidas críticas.
 - Nest emite TypeScript `.d.ts` y JavaScript `.js` en `dist/` para runtime.
 - Las migraciones de PostgreSQL se crean automáticamente en el inicio del API (`database.service.ts`).
+
+## OTP para entorno real (checklist corto)
+
+1. Completar `.env.prod` con `SMTP_*` reales y `OTP_HASH_SECRET` fuerte.
+2. Configurar SPF, DKIM y DMARC del dominio de envio.
+3. Levantar con `docker compose --env-file .env.prod up -d`.
+4. Verificar request/verify OTP desde una IP real y revisar limites/cooldown.
 
 ## Proximos pasos
 
