@@ -36,6 +36,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     `);
 
     await this.pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS full_name TEXT;
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS sex TEXT;
+    `);
+
+    await this.pool.query(`
       CREATE TABLE IF NOT EXISTS otp_codes (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

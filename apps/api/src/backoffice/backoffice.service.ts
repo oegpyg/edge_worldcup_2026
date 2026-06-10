@@ -35,6 +35,8 @@ type MatchRow = {
 type OfficialStatusRow = {
   id: number;
   email: string;
+  full_name: string | null;
+  sex: string | null;
   created_at: string;
   prediction_updated_at: string | null;
   qualified_codes: string[] | null;
@@ -57,6 +59,10 @@ type DemoUserRow = {
 
 type UserEmailRow = {
   email: string;
+};
+
+type CountRow = {
+  count: string;
 };
 
 type MatchResultRow = {
@@ -107,30 +113,54 @@ export class BackofficeService {
 
     const parsed = this.parseOfficialsCsv(csvContent);
 
-    if (parsed.validEmails.length === 0) {
+    if (parsed.rows.length === 0) {
       throw new BadRequestException('CSV sin correos validos para importar.');
     }
 
+    const emails = parsed.rows.map((row) => row.email);
+    const names = parsed.rows.map((row) => row.fullName);
+    const sexes = parsed.rows.map((row) => row.sex);
+
+    const existingResult = await this.databaseService.query<CountRow>(
+      `
+        SELECT COUNT(*)::text AS count
+        FROM users
+        WHERE email = ANY($1::text[]);
+      `,
+      [emails],
+    );
+    const existingUsers = Number(existingResult.rows[0]?.count ?? '0');
+
     const insertResult = await this.databaseService.query<UserEmailRow>(
       `
-        INSERT INTO users (email)
-        SELECT DISTINCT email
-        FROM unnest($1::text[]) AS email
-        ON CONFLICT (email) DO NOTHING
+        INSERT INTO users (email, full_name, sex)
+        SELECT email, full_name, sex
+        FROM unnest($1::text[], $2::text[], $3::text[]) AS source(email, full_name, sex)
+        ON CONFLICT (email)
+        DO UPDATE SET
+          full_name = CASE
+            WHEN EXCLUDED.full_name IS NOT NULL AND EXCLUDED.full_name <> '' THEN EXCLUDED.full_name
+            ELSE users.full_name
+          END,
+          sex = COALESCE(EXCLUDED.sex, users.sex)
         RETURNING email;
       `,
-      [parsed.validEmails],
+      [emails, names, sexes],
     );
-    const createdUsers = insertResult.rowCount ?? 0;
+    const upsertedUsers = insertResult.rowCount ?? 0;
+    const createdUsers = Math.max(0, upsertedUsers - existingUsers);
+    const updatedUsers = Math.max(0, existingUsers);
 
     return {
       success: true,
       processedRows: parsed.processedRows,
-      validRows: parsed.validEmails.length,
+      validRows: parsed.rows.length,
       createdUsers,
-      alreadyExisting: parsed.validEmails.length - createdUsers,
+      updatedUsers,
+      alreadyExisting: existingUsers,
       ignoredRows: parsed.ignoredRows,
       invalidRows: parsed.invalidRows,
+      invalidSexRows: parsed.invalidSexRows,
       duplicatesInFile: parsed.duplicatesInFile,
       message: 'Importacion CSV completada.',
     };
@@ -261,6 +291,8 @@ export class BackofficeService {
         SELECT
           u.id,
           u.email,
+          u.full_name,
+          u.sex,
           u.created_at,
           up.updated_at AS prediction_updated_at,
           up.qualified_codes,
@@ -284,6 +316,8 @@ export class BackofficeService {
       return {
         id: row.id,
         email: row.email,
+        fullName: row.full_name,
+        sex: row.sex,
         createdAt: row.created_at,
         predictionUpdatedAt: row.prediction_updated_at,
         qualifiedCount: qualifiedCodes.length,
@@ -809,53 +843,72 @@ export class BackofficeService {
         processedRows: 0,
         ignoredRows: 0,
         invalidRows: 0,
+        invalidSexRows: 0,
         duplicatesInFile: 0,
-        validEmails: [] as string[],
+        rows: [] as Array<{ email: string; fullName: string | null; sex: 'male' | 'female' | null }>,
       };
     }
 
-    const firstParts = this.splitCsvLine(lines[0]);
-    const emailColumnIndex = this.detectEmailColumnIndex(firstParts);
+    const firstColumns = this.splitCsvLine(lines[0]);
+    const emailColumnIndex = this.detectEmailColumnIndex(firstColumns);
+    const nameColumnIndex = this.detectNameColumnIndex(firstColumns);
+    const sexColumnIndex = this.detectSexColumnIndex(firstColumns);
+    const hasHeader = emailColumnIndex >= 0 || nameColumnIndex >= 0 || sexColumnIndex >= 0;
 
-    const dataLines = emailColumnIndex >= 0 ? lines.slice(1) : lines;
-    const uniqueEmails = new Set<string>();
+    const dataLines = hasHeader ? lines.slice(1) : lines;
+    const rowByEmail = new Map<string, { email: string; fullName: string | null; sex: 'male' | 'female' | null }>();
     let ignoredRows = 0;
     let invalidRows = 0;
+    let invalidSexRows = 0;
     let duplicatesInFile = 0;
 
     for (const rawLine of dataLines) {
       const columns = this.splitCsvLine(rawLine);
-      const candidate =
-        emailColumnIndex >= 0
-          ? (columns[emailColumnIndex] ?? '').trim()
-          : (columns[0] ?? '').trim();
+      const candidate = this.extractColumn(columns, emailColumnIndex, 0).toLowerCase();
 
       if (!candidate) {
         ignoredRows += 1;
         continue;
       }
 
-      const normalizedEmail = candidate.toLowerCase();
-
-      if (!this.isValidEmail(normalizedEmail)) {
+      if (!this.isValidEmail(candidate)) {
         invalidRows += 1;
         continue;
       }
 
-      if (uniqueEmails.has(normalizedEmail)) {
+      const sexCandidate = this.extractColumn(columns, sexColumnIndex, 2);
+      const normalizedSex = this.normalizeSex(sexCandidate);
+      if (sexCandidate && normalizedSex === null) {
+        invalidSexRows += 1;
+      }
+
+      if (rowByEmail.has(candidate)) {
         duplicatesInFile += 1;
+        const current = rowByEmail.get(candidate)!;
+        const fullName = this.extractColumn(columns, nameColumnIndex, 1);
+        rowByEmail.set(candidate, {
+          email: candidate,
+          fullName: fullName || current.fullName,
+          sex: normalizedSex ?? current.sex,
+        });
         continue;
       }
 
-      uniqueEmails.add(normalizedEmail);
+      const fullName = this.extractColumn(columns, nameColumnIndex, 1);
+      rowByEmail.set(candidate, {
+        email: candidate,
+        fullName: fullName || null,
+        sex: normalizedSex,
+      });
     }
 
     return {
       processedRows: dataLines.length,
       ignoredRows,
       invalidRows,
+      invalidSexRows,
       duplicatesInFile,
-      validEmails: Array.from(uniqueEmails),
+      rows: Array.from(rowByEmail.values()),
     };
   }
 
@@ -866,12 +919,48 @@ export class BackofficeService {
     });
   }
 
+  private detectNameColumnIndex(columns: string[]) {
+    return columns.findIndex((item) => {
+      const normalized = item.toLowerCase().replace(/[^a-z]/g, '');
+      return normalized === 'name' || normalized === 'nombre' || normalized === 'fullname' || normalized === 'nombres';
+    });
+  }
+
+  private detectSexColumnIndex(columns: string[]) {
+    return columns.findIndex((item) => {
+      const normalized = item.toLowerCase().replace(/[^a-z]/g, '');
+      return normalized === 'sex' || normalized === 'sexo' || normalized === 'gender' || normalized === 'genero';
+    });
+  }
+
+  private extractColumn(columns: string[], detectedIndex: number, fallbackIndex: number) {
+    const index = detectedIndex >= 0 ? detectedIndex : fallbackIndex;
+    return (columns[index] ?? '').trim();
+  }
+
   private splitCsvLine(line: string) {
     return line.split(';').length > line.split(',').length ? line.split(';').map((item) => item.trim()) : line.split(',').map((item) => item.trim());
   }
 
   private isValidEmail(value: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  }
+
+  private normalizeSex(value: string) {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+
+    if (['m', 'male', 'masculino', 'hombre', 'varon'].includes(normalized)) {
+      return 'male' as const;
+    }
+
+    if (['f', 'female', 'femenino', 'mujer'].includes(normalized)) {
+      return 'female' as const;
+    }
+
+    return null;
   }
 
   private async readPredictionLockAt() {

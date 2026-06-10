@@ -5,6 +5,8 @@ import { DatabaseService } from './database/database.service';
 type LeaderboardPredictionRow = {
   id: number;
   email: string;
+  full_name: string | null;
+  sex: string | null;
   prediction_updated_at: string | Date | null;
   qualified_codes: string[] | null;
   finalist_codes: string[] | null;
@@ -64,6 +66,15 @@ function normalizeName(email: string) {
     .join(' ');
 }
 
+function resolveDisplayName(fullName: string | null, email: string) {
+  const clean = (fullName ?? '').trim();
+  if (clean) {
+    return clean;
+  }
+
+  return normalizeName(email);
+}
+
 function streakLevelFromPoints(points: number) {
   if (points >= 30) {
     return 5;
@@ -102,6 +113,19 @@ function scoreLabel(streakLevel: number) {
 
 function avatarRowFromId(id: number) {
   return id % 2 === 0 ? 'female' : 'male';
+}
+
+function avatarRowFromSex(sex: string | null, userId: number) {
+  const normalized = (sex ?? '').trim().toLowerCase();
+  if (normalized === 'female') {
+    return 'female' as const;
+  }
+
+  if (normalized === 'male') {
+    return 'male' as const;
+  }
+
+  return avatarRowFromId(userId);
 }
 
 function avatarFrameFromStreak(streakLevel: number) {
@@ -154,6 +178,8 @@ export class AppController {
         SELECT
           u.id,
           u.email,
+          u.full_name,
+          u.sex,
           up.updated_at AS prediction_updated_at,
           up.qualified_codes,
           up.finalist_codes,
@@ -242,12 +268,12 @@ export class AppController {
         const pointsFromChampion = row.champion_code && row.champion_code === champion ? 1 : 0;
         const points = pointsFromQualifiers + pointsFromFinalists + pointsFromChampion;
         const streakLevel = streakLevelFromPoints(points);
-        const avatarRow = avatarRowFromId(row.id);
+        const avatarRow = avatarRowFromSex(row.sex, row.id);
         const avatarFrame = avatarFrameFromStreak(streakLevel);
 
         return {
           id: row.id,
-          name: normalizeName(row.email),
+          name: resolveDisplayName(row.full_name, row.email),
           predictionUpdatedAt: row.prediction_updated_at,
           points,
           progress: Math.min(100, Math.round((points / DASHBOARD_GOAL_POINTS) * 100)),

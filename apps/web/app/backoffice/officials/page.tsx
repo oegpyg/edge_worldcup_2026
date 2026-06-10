@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react';
 type OfficialStatus = {
   id: number;
   email: string;
+  fullName: string | null;
+  sex: string | null;
   createdAt: string;
   predictionUpdatedAt: string | null;
   qualifiedCount: number;
@@ -104,13 +106,15 @@ export default function BackofficeOfficialsPage() {
 
       const payload = (await response.json()) as {
         createdUsers: number;
+        updatedUsers: number;
         alreadyExisting: number;
         invalidRows: number;
+        invalidSexRows: number;
         duplicatesInFile: number;
       };
 
       setNotice(
-        `Importacion ok: ${payload.createdUsers} nuevos, ${payload.alreadyExisting} existentes, ${payload.invalidRows} invalidos, ${payload.duplicatesInFile} duplicados en archivo.`,
+        `Importacion ok: ${payload.createdUsers} nuevos, ${payload.updatedUsers} actualizados, ${payload.alreadyExisting} existentes, ${payload.invalidRows} emails invalidos, ${payload.invalidSexRows} sexos invalidos, ${payload.duplicatesInFile} duplicados.`,
       );
       setCsvFile(null);
       await loadOfficials();
@@ -165,13 +169,14 @@ export default function BackofficeOfficialsPage() {
             Importar CSV
           </button>
         </div>
-        <p className="small">CSV esperado: columna email o correo (con o sin encabezado).</p>
+        <p className="small">CSV esperado: email, nombre y sexo. Encabezados validos: email/correo, nombre/name, sexo/sex.</p>
 
         <div className="table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
                 <th>Funcionario</th>
+                  <th>Sexo</th>
                 <th>Estado</th>
                 <th>Puntos</th>
                 <th>Progreso</th>
@@ -184,8 +189,10 @@ export default function BackofficeOfficialsPage() {
                 <tr key={official.id}>
                   <td>
                     <strong>{official.email}</strong>
+                    {official.fullName ? <span>Nombre: {official.fullName}</span> : null}
                     <span>Alta: {new Date(official.createdAt).toLocaleString()}</span>
                   </td>
+                  <td>{official.sex === 'female' ? 'female' : official.sex === 'male' ? 'male' : '-'}</td>
                   <td>
                     <span className={`status-chip status-chip-${official.status}`}>{official.status}</span>
                   </td>
