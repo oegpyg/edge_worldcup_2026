@@ -9,6 +9,7 @@ import { DemoResetDto } from './dto/demo-reset.dto';
 import { GenerateDemoMatchesDto } from './dto/generate-demo-matches.dto';
 import { GenerateDemoPredictionsDto } from './dto/generate-demo-predictions.dto';
 import { ImportOfficialsCsvDto } from './dto/import-officials-csv.dto';
+import { SetMatchResultDto } from './dto/set-match-result.dto';
 import { SetPredictionLockDto } from './dto/set-prediction-lock.dto';
 
 @Controller('backoffice')
@@ -101,6 +102,15 @@ export class BackofficeController {
   @Post('matches')
   createMatch(@Headers('x-admin-token') adminToken: string | undefined, @Body() body: CreateMatchDto) {
     return this.backofficeService.createMatch(adminToken, body);
+  }
+
+  @Post('matches/:id/result')
+  setMatchResult(
+    @Headers('x-admin-token') adminToken: string | undefined,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SetMatchResultDto,
+  ) {
+    return this.backofficeService.setMatchResult(adminToken, id, body.homeScore, body.awayScore);
   }
 
   @Delete('matches/:id')

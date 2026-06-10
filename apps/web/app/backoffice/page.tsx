@@ -20,6 +20,13 @@ type MatchItem = {
   kickoff: string;
   stage: string;
   venue: string;
+  homeScore: number | null;
+  awayScore: number | null;
+};
+
+type MatchResultDraft = {
+  homeScore: string;
+  awayScore: string;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -55,6 +62,7 @@ export default function BackofficePage() {
   const [notice, setNotice] = useState('');
   const [isBusy, setIsBusy] = useState(false);
   const [adminToken, setAdminToken] = useState('');
+  const [resultDrafts, setResultDrafts] = useState<Record<number, MatchResultDraft>>({});
 
   useEffect(() => {
     const token = window.localStorage.getItem(ADMIN_TOKEN_KEY);
@@ -102,6 +110,17 @@ export default function BackofficePage() {
 
       setCountries(sortByName(countriesPayload));
       setMatches(matchesPayload);
+      setResultDrafts(
+        Object.fromEntries(
+          matchesPayload.map((match) => [
+            match.id,
+            {
+              homeScore: match.homeScore == null ? '' : String(match.homeScore),
+              awayScore: match.awayScore == null ? '' : String(match.awayScore),
+            },
+          ]),
+        ),
+      );
     } catch {
       setNotice('No se pudo conectar al backend. Revisa API en localhost:4000.');
     } finally {
@@ -280,6 +299,57 @@ export default function BackofficePage() {
         setNotice('Partido eliminado.');
       } catch {
         setNotice('No se pudo eliminar partido.');
+      } finally {
+        setIsBusy(false);
+      }
+    })();
+  }
+
+  function updateResultDraft(matchId: number, field: 'homeScore' | 'awayScore', value: string) {
+    const normalized = value.replace(/[^0-9]/g, '').slice(0, 2);
+    setResultDrafts((current) => ({
+      ...current,
+      [matchId]: {
+        homeScore: current[matchId]?.homeScore ?? '',
+        awayScore: current[matchId]?.awayScore ?? '',
+        [field]: normalized,
+      },
+    }));
+  }
+
+  function saveMatchResult(matchId: number) {
+    void (async () => {
+      const draft = resultDrafts[matchId];
+      const homeScore = Number(draft?.homeScore);
+      const awayScore = Number(draft?.awayScore);
+
+      if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
+        setNotice('Debes cargar marcador valido para local y visita.');
+        return;
+      }
+
+      try {
+        setIsBusy(true);
+        const response = await fetch(`${API_URL}/backoffice/matches/${matchId}/result`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-token': adminToken,
+          },
+          body: JSON.stringify({
+            homeScore,
+            awayScore,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('No se pudo guardar resultado');
+        }
+
+        await loadData(adminToken);
+        setNotice('Resultado guardado.');
+      } catch {
+        setNotice('No se pudo guardar resultado del partido.');
       } finally {
         setIsBusy(false);
       }
@@ -487,6 +557,7 @@ export default function BackofficePage() {
                   <th>Partido</th>
                   <th>Fecha</th>
                   <th>Fase</th>
+                  <th>Resultado</th>
                   <th></th>
                 </tr>
               </thead>
@@ -501,6 +572,28 @@ export default function BackofficePage() {
                     </td>
                     <td>{new Date(match.kickoff).toLocaleString()}</td>
                     <td>{match.stage}</td>
+                    <td>
+                      <div className="match-result-editor">
+                        <input
+                          className="input match-result-input"
+                          value={resultDrafts[match.id]?.homeScore ?? ''}
+                          onChange={(event) => updateResultDraft(match.id, 'homeScore', event.target.value)}
+                          placeholder="0"
+                          inputMode="numeric"
+                        />
+                        <span>-</span>
+                        <input
+                          className="input match-result-input"
+                          value={resultDrafts[match.id]?.awayScore ?? ''}
+                          onChange={(event) => updateResultDraft(match.id, 'awayScore', event.target.value)}
+                          placeholder="0"
+                          inputMode="numeric"
+                        />
+                        <button className="button button-secondary" type="button" onClick={() => saveMatchResult(match.id)}>
+                          Guardar
+                        </button>
+                      </div>
+                    </td>
                     <td>
                       <button className="mini-button" type="button" onClick={() => deleteMatch(match.id)}>
                         Quitar

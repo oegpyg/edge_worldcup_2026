@@ -703,6 +703,33 @@ export class BackofficeService {
     };
   }
 
+  async setMatchResult(adminToken: string | undefined, id: number, homeScore: number, awayScore: number) {
+    this.assertAdminToken(adminToken);
+
+    const result = await this.databaseService.query<{ id: number }>(
+      `
+        UPDATE wc_matches
+        SET home_score = $2,
+            away_score = $3,
+            result_updated_at = NOW()
+        WHERE id = $1
+        RETURNING id;
+      `,
+      [id, homeScore, awayScore],
+    );
+
+    if (result.rowCount === 0) {
+      throw new NotFoundException('Partido no encontrado');
+    }
+
+    return {
+      success: true,
+      id,
+      homeScore,
+      awayScore,
+    };
+  }
+
   async deleteMatch(adminToken: string | undefined, id: number) {
     this.assertAdminToken(adminToken);
 
