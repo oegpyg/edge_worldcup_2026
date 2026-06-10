@@ -224,6 +224,7 @@ export default function DashboardPage() {
         <div className="race-list">
           {topTen.map((leader) => {
             const tone = laneTone(leader.rank);
+            const hasFireAura = leader.points > 25;
             const style = {
               '--progress': `${leader.progress}%`,
             } as CSSProperties;
@@ -232,7 +233,7 @@ export default function DashboardPage() {
               <article className={`race-row ${tone} ${leader.isPremium ? 'is-premium' : ''}`} key={leader.id} style={style}>
                 <div className="race-rank">{leader.rank}</div>
                 <div className="race-runner">
-                  <div className={`race-avatar-wrap ${leader.isPremium ? 'is-premium' : ''}`}>
+                  <div className={`race-avatar-wrap ${leader.isPremium ? 'is-premium' : ''} ${hasFireAura ? 'is-on-fire' : ''}`}>
                     <img
                       className="race-avatar"
                       src={leader.avatarImage}
@@ -255,7 +256,7 @@ export default function DashboardPage() {
 
                 <div className="race-lane" aria-hidden="true">
                   <div className="race-progress" />
-                  <div className={`race-avatar-wrap race-avatar-inline ${leader.isPremium ? 'is-premium' : ''}`}>
+                  <div className={`race-avatar-wrap race-avatar-inline ${leader.isPremium ? 'is-premium' : ''} ${hasFireAura ? 'is-on-fire' : ''}`}>
                     <img className="race-avatar" src={leader.avatarImage} alt="" />
                   </div>
                 </div>
@@ -274,10 +275,13 @@ export default function DashboardPage() {
             </div>
 
             <div className="race-rest-list">
-              {others.map((leader) => (
+              {others.map((leader) => {
+                const hasFireAura = leader.points > 25;
+
+                return (
                 <article className={`race-rest-row ${leader.isPremium ? 'is-premium' : ''}`} key={leader.id}>
                   <div className="race-rest-rank">#{leader.rank}</div>
-                  <div className={`race-avatar-wrap race-avatar-small-wrap ${leader.isPremium ? 'is-premium' : ''}`}>
+                  <div className={`race-avatar-wrap race-avatar-small-wrap ${leader.isPremium ? 'is-premium' : ''} ${hasFireAura ? 'is-on-fire' : ''}`}>
                     <img className="race-avatar race-avatar-small" src={leader.avatarImage} alt={`Avatar ${leader.name}`} />
                     {leader.isPremium && <span className="premium-mark premium-mark-small">P</span>}
                   </div>
@@ -290,7 +294,8 @@ export default function DashboardPage() {
                   </div>
                   <div className="race-rest-points">{leader.points} pts</div>
                 </article>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
