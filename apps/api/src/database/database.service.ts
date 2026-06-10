@@ -131,6 +131,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         last_points INTEGER NOT NULL DEFAULT 0,
+        hit_streak INTEGER NOT NULL DEFAULT 0,
         miss_streak INTEGER NOT NULL DEFAULT 0,
         last_results_version TEXT NOT NULL DEFAULT 'no-results',
         fail_avatar_key TEXT,
@@ -141,6 +142,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     await this.pool.query(`
       ALTER TABLE user_scoring_state
       ADD COLUMN IF NOT EXISTS last_points INTEGER NOT NULL DEFAULT 0;
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE user_scoring_state
+      ADD COLUMN IF NOT EXISTS hit_streak INTEGER NOT NULL DEFAULT 0;
     `);
 
     await this.pool.query(`

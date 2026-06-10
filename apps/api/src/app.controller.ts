@@ -31,6 +31,7 @@ type ResultsVersionRow = {
 type UserScoringStateRow = {
   user_id: number;
   last_points: number;
+  hit_streak: number;
   miss_streak: number;
   last_results_version: string;
   fail_avatar_key: string | null;
@@ -288,6 +289,7 @@ export class AppController {
           ...entry,
           avatarImage,
           isPremium: premiumKey != null,
+          hitStreak: failState?.hitStreak ?? 0,
           missStreak: failState?.missStreak ?? 0,
           isFailStreak: failAvatarKey != null,
         };
@@ -389,13 +391,13 @@ export class AppController {
   private async syncFailStreakState(entries: Array<{ id: number; points: number }>, resultsVersion: string) {
     const stateResult = await this.databaseService.query<UserScoringStateRow>(
       `
-        SELECT user_id, last_points, miss_streak, last_results_version, fail_avatar_key
+        SELECT user_id, last_points, hit_streak, miss_streak, last_results_version, fail_avatar_key
         FROM user_scoring_state;
       `,
     );
 
     const currentState = new Map(stateResult.rows.map((row) => [row.user_id, row]));
-    const nextState = new Map<number, { missStreak: number; failAvatarKey: string | null }>();
+    const nextState = new Map<number, { hitStreak: number; missStreak: number; failAvatarKey: string | null }>();
 
     for (const entry of entries) {
       const existing = currentState.get(entry.id);
@@ -403,8 +405,8 @@ export class AppController {
       if (!existing) {
         await this.databaseService.query(
           `
-            INSERT INTO user_scoring_state (user_id, last_points, miss_streak, last_results_version, fail_avatar_key)
-            VALUES ($1, $2, 0, $3, NULL)
+            INSERT INTO user_scoring_state (user_id, last_points, hit_streak, miss_streak, last_results_version, fail_avatar_key)
+            VALUES ($1, $2, 0, 0, $3, NULL)
             ON CONFLICT (user_id)
             DO UPDATE SET
               last_points = EXCLUDED.last_points,
@@ -414,12 +416,13 @@ export class AppController {
           [entry.id, entry.points, resultsVersion],
         );
 
-        nextState.set(entry.id, { missStreak: 0, failAvatarKey: null });
+        nextState.set(entry.id, { hitStreak: 0, missStreak: 0, failAvatarKey: null });
         continue;
       }
 
       if (existing.last_results_version === resultsVersion) {
         nextState.set(entry.id, {
+          hitStreak: existing.hit_streak,
           missStreak: existing.miss_streak,
           failAvatarKey: existing.fail_avatar_key,
         });
@@ -428,7 +431,8 @@ export class AppController {
 
       const pointsIncreased = entry.points > existing.last_points;
       const pointsDecreased = entry.points < existing.last_points;
-      const nextMissStreak = pointsIncreased ? 0 : pointsDecreased ? existing.miss_streak + 1 : 0;
+      const nextHitStreak = pointsIncreased ? existing.hit_streak + 1 : 0;
+      const nextMissStreak = pointsDecreased ? existing.miss_streak + 1 : 0;
       const nextFailAvatarKey =
         nextMissStreak >= MISS_STREAK_FAIL_THRESHOLD
           ? existing.fail_avatar_key ?? this.pickRandomFailAvatarKey()
@@ -436,20 +440,22 @@ export class AppController {
 
       await this.databaseService.query(
         `
-          INSERT INTO user_scoring_state (user_id, last_points, miss_streak, last_results_version, fail_avatar_key)
-          VALUES ($1, $2, $3, $4, $5)
+          INSERT INTO user_scoring_state (user_id, last_points, hit_streak, miss_streak, last_results_version, fail_avatar_key)
+          VALUES ($1, $2, $3, $4, $5, $6)
           ON CONFLICT (user_id)
           DO UPDATE SET
             last_points = EXCLUDED.last_points,
+            hit_streak = EXCLUDED.hit_streak,
             miss_streak = EXCLUDED.miss_streak,
             last_results_version = EXCLUDED.last_results_version,
             fail_avatar_key = EXCLUDED.fail_avatar_key,
             updated_at = NOW();
         `,
-        [entry.id, entry.points, nextMissStreak, resultsVersion, nextFailAvatarKey],
+        [entry.id, entry.points, nextHitStreak, nextMissStreak, resultsVersion, nextFailAvatarKey],
       );
 
       nextState.set(entry.id, {
+        hitStreak: nextHitStreak,
         missStreak: nextMissStreak,
         failAvatarKey: nextFailAvatarKey,
       });

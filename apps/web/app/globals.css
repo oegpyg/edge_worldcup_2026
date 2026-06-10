@@ -993,6 +993,19 @@ input {
   border-left: 1px solid rgba(132, 182, 255, 0.2);
 }
 
+.race-metrics-logo {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.topbar-edge-logo {
+  width: 120px;
+  height: auto;
+  filter: brightness(10);
+  display: block;
+}
+
 .race-metrics span {
   font-size: 12px;
   color: var(--muted);
