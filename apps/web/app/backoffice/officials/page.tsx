@@ -27,6 +27,7 @@ export default function BackofficeOfficialsPage() {
   const [isBusy, setIsBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [adminToken, setAdminToken] = useState('');
+  const [csvFile, setCsvFile] = useState<File | null>(null);
 
   useEffect(() => {
     const token = window.localStorage.getItem(ADMIN_TOKEN_KEY);
@@ -72,6 +73,55 @@ export default function BackofficeOfficialsPage() {
     }
   }
 
+  async function importOfficialsCsv() {
+    if (!adminToken || !csvFile) {
+      setNotice('Selecciona un archivo CSV para importar.');
+      return;
+    }
+
+    try {
+      setIsBusy(true);
+      const csvContent = await csvFile.text();
+      const response = await fetch(`${API_URL}/backoffice/officials/import-csv`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-admin-token': adminToken,
+        },
+        body: JSON.stringify({ csvContent }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+          router.replace('/backoffice/login');
+          return;
+        }
+
+        const errorPayload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(errorPayload?.message ?? 'No se pudo importar el CSV.');
+      }
+
+      const payload = (await response.json()) as {
+        createdUsers: number;
+        alreadyExisting: number;
+        invalidRows: number;
+        duplicatesInFile: number;
+      };
+
+      setNotice(
+        `Importacion ok: ${payload.createdUsers} nuevos, ${payload.alreadyExisting} existentes, ${payload.invalidRows} invalidos, ${payload.duplicatesInFile} duplicados en archivo.`,
+      );
+      setCsvFile(null);
+      await loadOfficials();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo importar el CSV.';
+      setNotice(message);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   return (
     <main className="backoffice-shell">
       <section className="backoffice-head">
@@ -103,6 +153,19 @@ export default function BackofficeOfficialsPage() {
       <section className="panel backoffice-card">
         <h2>Listado de funcionarios</h2>
         <p>{officials.length} funcionarios cargados</p>
+
+        <div className="import-row">
+          <input
+            className="input"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
+          />
+          <button className="button button-primary" type="button" onClick={() => void importOfficialsCsv()} disabled={isBusy}>
+            Importar CSV
+          </button>
+        </div>
+        <p className="small">CSV esperado: columna email o correo (con o sin encabezado).</p>
 
         <div className="table-wrap">
           <table className="admin-table">

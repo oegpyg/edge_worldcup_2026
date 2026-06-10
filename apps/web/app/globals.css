@@ -826,6 +826,13 @@ input {
   font-size: 26px;
 }
 
+.import-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin: 14px 0 8px;
+}
+
 .backoffice-card-full {
   grid-column: 1 / -1;
 }

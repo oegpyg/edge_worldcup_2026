@@ -55,6 +55,10 @@ type DemoUserRow = {
   email: string;
 };
 
+type UserEmailRow = {
+  email: string;
+};
+
 type MatchResultRow = {
   home_code: string;
   away_code: string;
@@ -97,6 +101,40 @@ function loadFallbackCountries() {
 @Injectable()
 export class BackofficeService {
   constructor(private readonly databaseService: DatabaseService) {}
+
+  async importOfficialsFromCsv(adminToken: string | undefined, csvContent: string) {
+    this.assertAdminToken(adminToken);
+
+    const parsed = this.parseOfficialsCsv(csvContent);
+
+    if (parsed.validEmails.length === 0) {
+      throw new BadRequestException('CSV sin correos validos para importar.');
+    }
+
+    const insertResult = await this.databaseService.query<UserEmailRow>(
+      `
+        INSERT INTO users (email)
+        SELECT DISTINCT email
+        FROM unnest($1::text[]) AS email
+        ON CONFLICT (email) DO NOTHING
+        RETURNING email;
+      `,
+      [parsed.validEmails],
+    );
+    const createdUsers = insertResult.rowCount ?? 0;
+
+    return {
+      success: true,
+      processedRows: parsed.processedRows,
+      validRows: parsed.validEmails.length,
+      createdUsers,
+      alreadyExisting: parsed.validEmails.length - createdUsers,
+      ignoredRows: parsed.ignoredRows,
+      invalidRows: parsed.invalidRows,
+      duplicatesInFile: parsed.duplicatesInFile,
+      message: 'Importacion CSV completada.',
+    };
+  }
 
   adminLogin(username: string, password: string) {
     const envUser = process.env.BACKOFFICE_ADMIN_USER ?? 'admin';
@@ -757,6 +795,83 @@ export class BackofficeService {
     if (!adminToken || adminToken !== expected) {
       throw new UnauthorizedException('No autorizado para backoffice');
     }
+  }
+
+  private parseOfficialsCsv(csvContent: string) {
+    const normalized = csvContent.replace(/^\uFEFF/, '');
+    const lines = normalized
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    if (lines.length === 0) {
+      return {
+        processedRows: 0,
+        ignoredRows: 0,
+        invalidRows: 0,
+        duplicatesInFile: 0,
+        validEmails: [] as string[],
+      };
+    }
+
+    const firstParts = this.splitCsvLine(lines[0]);
+    const emailColumnIndex = this.detectEmailColumnIndex(firstParts);
+
+    const dataLines = emailColumnIndex >= 0 ? lines.slice(1) : lines;
+    const uniqueEmails = new Set<string>();
+    let ignoredRows = 0;
+    let invalidRows = 0;
+    let duplicatesInFile = 0;
+
+    for (const rawLine of dataLines) {
+      const columns = this.splitCsvLine(rawLine);
+      const candidate =
+        emailColumnIndex >= 0
+          ? (columns[emailColumnIndex] ?? '').trim()
+          : (columns[0] ?? '').trim();
+
+      if (!candidate) {
+        ignoredRows += 1;
+        continue;
+      }
+
+      const normalizedEmail = candidate.toLowerCase();
+
+      if (!this.isValidEmail(normalizedEmail)) {
+        invalidRows += 1;
+        continue;
+      }
+
+      if (uniqueEmails.has(normalizedEmail)) {
+        duplicatesInFile += 1;
+        continue;
+      }
+
+      uniqueEmails.add(normalizedEmail);
+    }
+
+    return {
+      processedRows: dataLines.length,
+      ignoredRows,
+      invalidRows,
+      duplicatesInFile,
+      validEmails: Array.from(uniqueEmails),
+    };
+  }
+
+  private detectEmailColumnIndex(columns: string[]) {
+    return columns.findIndex((item) => {
+      const normalized = item.toLowerCase().replace(/[^a-z]/g, '');
+      return normalized === 'email' || normalized === 'correo' || normalized === 'correoelectronico';
+    });
+  }
+
+  private splitCsvLine(line: string) {
+    return line.split(';').length > line.split(',').length ? line.split(';').map((item) => item.trim()) : line.split(',').map((item) => item.trim());
+  }
+
+  private isValidEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   }
 
   private async readPredictionLockAt() {
