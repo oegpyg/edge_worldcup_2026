@@ -1210,6 +1210,130 @@ input {
   color: #dff2ff;
 }
 
+.race-groups-panel {
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+}
+
+.race-groups-tables {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 960px) {
+  .race-groups-tables {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .race-groups-tables {
+    grid-template-columns: 1fr;
+  }
+}
+
+.race-group-table-wrap {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.race-group-table-wrap h3 {
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b5cbff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.race-group-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.race-group-table thead {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.race-group-table th {
+  padding: 10px 8px;
+  text-align: right;
+  font-weight: 700;
+  color: #8fa3d0;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.race-group-table .pos-col {
+  width: 28px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.race-group-table th:first-child {
+  text-align: left;
+}
+
+.race-group-table td {
+  padding: 10px 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  text-align: right;
+  color: #f8fbff;
+}
+
+.race-group-table td:first-child {
+  text-align: left;
+}
+
+.race-group-table .team-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.team-flag {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.race-group-table .pts-bold {
+  font-weight: 700;
+  color: #ffd700;
+}
+
+.race-group-table tr.is-directo {
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.race-group-table tr.is-directo td {
+  border-top-color: rgba(52, 211, 153, 0.16);
+}
+
+.race-group-table tr.is-tercero {
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.race-group-table tr.is-tercero td {
+  border-top-color: rgba(245, 158, 11, 0.12);
+}
+
+.race-group-table .positive {
+  color: #a8f4d3;
+}
+
+.race-group-table .negative {
+  color: #ff9a9a;
+}
+
 .race-row {
   border: 1px solid rgba(120, 170, 255, 0.18);
   border-radius: 14px;

@@ -20,6 +20,34 @@ type MatchResultRow = {
   away_score: number | null;
 };
 
+type GroupCountryRow = {
+  code: string;
+  name: string;
+  group_name: string;
+};
+
+type TeamStandingRow = {
+  code: string;
+  name: string;
+  groupName: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+  progress: number;
+  qualificationStatus: 'directo' | 'tercero' | 'afuera';
+};
+
+type GroupStandingRow = {
+  groupName: string;
+  progress: number;
+  teams: TeamStandingRow[];
+};
+
 type PremiumClaimRow = {
   user_id: number;
   premium_avatar_key: string;
@@ -325,6 +353,8 @@ export class AppController {
         rank: index + 1,
       }));
 
+    const groupStandings = await this.buildGroupStandings();
+
     const now = new Date();
 
     return {
@@ -333,7 +363,166 @@ export class AppController {
       nextUpdateInSeconds: Math.max(1, 60 - now.getUTCSeconds()),
       liveUpdatedAt: now.toISOString(),
       leaders,
+      groups: groupStandings,
     };
+  }
+
+  private async buildGroupStandings() {
+    const countriesResult = await this.databaseService.query<GroupCountryRow>(
+      `
+        SELECT code, name, group_name
+        FROM wc_countries
+        ORDER BY group_name ASC, name ASC;
+      `,
+    );
+
+    const matchesResult = await this.databaseService.query<MatchResultRow>(
+      `
+        SELECT
+          hc.code AS home_code,
+          ac.code AS away_code,
+          m.home_score,
+          m.away_score
+        FROM wc_matches m
+        JOIN wc_countries hc ON hc.id = m.home_country_id
+        JOIN wc_countries ac ON ac.id = m.away_country_id
+        WHERE m.home_score IS NOT NULL
+          AND m.away_score IS NOT NULL
+        ORDER BY m.id ASC;
+      `,
+    );
+
+    const statsMap = new Map<string, Omit<TeamStandingRow, 'progress' | 'qualificationStatus'>>();
+
+    for (const country of countriesResult.rows) {
+      statsMap.set(country.code, {
+        code: country.code,
+        name: country.name,
+        groupName: country.group_name,
+        played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDifference: 0,
+        points: 0,
+      });
+    }
+
+    for (const match of matchesResult.rows) {
+      const home = statsMap.get(match.home_code);
+      const away = statsMap.get(match.away_code);
+
+      if (!home || !away) {
+        continue;
+      }
+
+      const homeScore = Number(match.home_score ?? 0);
+      const awayScore = Number(match.away_score ?? 0);
+
+      home.played += 1;
+      away.played += 1;
+      home.goalsFor += homeScore;
+      home.goalsAgainst += awayScore;
+      away.goalsFor += awayScore;
+      away.goalsAgainst += homeScore;
+      home.goalDifference = home.goalsFor - home.goalsAgainst;
+      away.goalDifference = away.goalsFor - away.goalsAgainst;
+
+      if (homeScore > awayScore) {
+        home.wins += 1;
+        home.points += 3;
+        away.losses += 1;
+      } else if (awayScore > homeScore) {
+        away.wins += 1;
+        away.points += 3;
+        home.losses += 1;
+      } else {
+        home.draws += 1;
+        away.draws += 1;
+        home.points += 1;
+        away.points += 1;
+      }
+    }
+
+    const compareStandings = (entryA: TeamStandingRow | Omit<TeamStandingRow, 'progress' | 'qualificationStatus'>, entryB: TeamStandingRow | Omit<TeamStandingRow, 'progress' | 'qualificationStatus'>) => {
+      if (entryB.points !== entryA.points) {
+        return entryB.points - entryA.points;
+      }
+
+      const diffA = entryA.goalDifference;
+      const diffB = entryB.goalDifference;
+      if (diffB !== diffA) {
+        return diffB - diffA;
+      }
+
+      if (entryB.goalsFor !== entryA.goalsFor) {
+        return entryB.goalsFor - entryA.goalsFor;
+      }
+
+      return entryA.name.localeCompare(entryB.name);
+    };
+
+    const grouped = new Map<string, GroupStandingRow>();
+    const groupNames = Array.from(new Set(countriesResult.rows.map((row) => row.group_name))).sort((groupA, groupB) => groupA.localeCompare(groupB));
+
+    for (const groupName of groupNames) {
+      const teams = countriesResult.rows
+        .filter((row) => row.group_name === groupName)
+        .map((country) => {
+          const stats = statsMap.get(country.code);
+          if (!stats) {
+            throw new Error(`No hay estadisticas para ${country.code}`);
+          }
+
+          return {
+            ...stats,
+            progress: Math.round((stats.played / 3) * 100),
+            qualificationStatus: 'afuera' as TeamStandingRow['qualificationStatus'],
+          };
+        })
+        .sort(compareStandings);
+
+      const groupProgress = teams.length > 0 ? Math.round((teams.reduce((sum, team) => sum + team.played, 0) / (teams.length * 3)) * 100) : 0;
+
+      grouped.set(groupName, {
+        groupName,
+        progress: groupProgress,
+        teams,
+      });
+    }
+
+    const thirdPlaceTeams = Array.from(grouped.values())
+      .map((group) => group.teams[2])
+      .filter((team): team is TeamStandingRow => team != null)
+      .sort(compareStandings)
+      .slice(0, 8);
+
+    const thirdPlaceQualifiedCodes = new Set(thirdPlaceTeams.map((team) => team.code));
+
+    const finalGroups = groupNames.map((groupName) => {
+      const group = grouped.get(groupName);
+      if (!group) {
+        return {
+          groupName,
+          progress: 0,
+          teams: [],
+        };
+      }
+
+      return {
+        ...group,
+        teams: group.teams.map((team, index) => ({
+          ...team,
+          progress: Math.round((team.played / 3) * 100),
+          qualificationStatus:
+            index < 2 ? 'directo' : index === 2 && thirdPlaceQualifiedCodes.has(team.code) ? 'tercero' : 'afuera',
+        })),
+      };
+    });
+
+    return finalGroups;
   }
 
   private async syncPremiumAvatars(

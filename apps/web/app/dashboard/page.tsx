@@ -27,9 +27,43 @@ type LeaderboardPayload = {
   nextUpdateInSeconds: number;
   liveUpdatedAt: string;
   leaders: LeaderItem[];
+  groups: GroupStanding[];
+};
+
+type GroupStandingTeam = {
+  code: string;
+  name: string;
+  groupName: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+  progress: number;
+  qualificationStatus: 'directo' | 'tercero' | 'afuera';
+};
+
+type GroupStanding = {
+  groupName: string;
+  progress: number;
+  teams: GroupStandingTeam[];
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+const FLAG_BY_CODE: Record<string, string> = {
+  CAN: '🇨🇦', MEX: '🇲🇽', USA: '🇺🇸', CUW: '🇨🇼', HAI: '🇭🇹', PAN: '🇵🇦',
+  ARG: '🇦🇷', BRA: '🇧🇷', COL: '🇨🇴', ECU: '🇪🇨', PAR: '🇵🇾', URU: '🇺🇾',
+  AUS: '🇦🇺', IRN: '🇮🇷', JPN: '🇯🇵', JOR: '🇯🇴', KOR: '🇰🇷', QAT: '🇶🇦',
+  KSA: '🇸🇦', UZB: '🇺🇿', IRQ: '🇮🇶', ALG: '🇩🇿', CPV: '🇨🇻', CIV: '🇨🇮',
+  EGY: '🇪🇬', GHA: '🇬🇭', MAR: '🇲🇦', SEN: '🇸🇳', RSA: '🇿🇦', TUN: '🇹🇳',
+  COD: '🇨🇩', NZL: '🇳🇿', AUT: '🇦🇹', BEL: '🇧🇪', BIH: '🇧🇦', CRO: '🇭🇷',
+  CZE: '🇨🇿', ENG: '🏴', FRA: '🇫🇷', GER: '🇩🇪', NED: '🇳🇱', POR: '🇵🇹',
+  NOR: '🇳🇴', SCO: '🏴', ESP: '🇪🇸', SWE: '🇸🇪', SUI: '🇨🇭', TUR: '🇹🇷',
+};
 
 function avatarSrc(row: 'male' | 'female', frame: number) {
   const normalized = Math.min(10, Math.max(1, frame + 1));
@@ -205,6 +239,7 @@ export default function DashboardPage() {
   }, []);
 
   const leaders = board?.leaders ?? [];
+  const groups = board?.groups ?? [];
   const topTen = leaders.slice(0, 10);
   const others = leaders.slice(10);
   const premiumCount = leaders.filter((leader) => leader.isPremium).length;
@@ -370,6 +405,56 @@ export default function DashboardPage() {
             </div>
           </section>
         )}
+      </section>
+
+      <section className="panel race-groups-panel">
+        <header className="race-board-head">
+          <div>
+            <h2>Clasificacion por grupo</h2>
+            <p>Tabla de posiciones actualizada en vivo conforme cargas resultados.</p>
+          </div>
+        </header>
+
+        <div className="race-groups-tables">
+          {groups.map((group) => (
+            <div className="race-group-table-wrap" key={group.groupName}>
+              <h3>Grupo {group.groupName}</h3>
+              <table className="race-group-table">
+                <thead>
+                  <tr>
+                    <th className="pos-col">#</th>
+                    <th>Equipo</th>
+                    <th>PJ</th>
+                    <th>G</th>
+                    <th>E</th>
+                    <th>P</th>
+                    <th>DG</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.teams.map((team, index) => (
+                    <tr key={team.code} className={`is-${team.qualificationStatus}`}>
+                      <td className="pos-col">{index + 1}</td>
+                      <td className="team-name">
+                        <span className="team-flag">{FLAG_BY_CODE[team.code] ?? '🏳️'}</span>
+                        {team.name}
+                      </td>
+                      <td>{team.played}</td>
+                      <td>{team.wins}</td>
+                      <td>{team.draws}</td>
+                      <td>{team.losses}</td>
+                      <td className={team.goalDifference >= 0 ? 'positive' : 'negative'}>
+                        {team.goalDifference >= 0 ? '+' : ''}{team.goalDifference}
+                      </td>
+                      <td className="pts-bold">{team.points}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="panel race-unlocks">
