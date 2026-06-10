@@ -226,7 +226,7 @@ export class AppController {
         return entryA.name.localeCompare(entryB.name);
       });
 
-    await this.assignPremiumAvatars(scoredLeaders);
+    await this.syncPremiumAvatars(scoredLeaders);
     const premiumClaimMap = await this.readPremiumClaimMap();
 
     const leaders = scoredLeaders
@@ -254,19 +254,12 @@ export class AppController {
     };
   }
 
-  private async assignPremiumAvatars(
+  private async syncPremiumAvatars(
     entries: Array<{ id: number; points: number; predictionUpdatedAt: string | Date | null }>,
   ) {
-    const claimMap = await this.readPremiumClaimMap();
-    const usedKeys = new Set(Array.from(claimMap.values()));
-
-    const availableKeys = PREMIUM_AVATAR_KEYS.filter((key) => !usedKeys.has(key));
-    if (availableKeys.length === 0) {
-      return;
-    }
-
+    const existingClaims = await this.readPremiumClaimMap();
     const eligible = entries
-      .filter((entry) => entry.points >= PREMIUM_THRESHOLD && !claimMap.has(entry.id))
+      .filter((entry) => entry.points >= PREMIUM_THRESHOLD)
       .sort((entryA, entryB) => {
         const aTime = entryA.predictionUpdatedAt
           ? new Date(entryA.predictionUpdatedAt).getTime()
@@ -280,19 +273,49 @@ export class AppController {
         }
 
         return entryA.id - entryB.id;
-      });
+      })
+      .slice(0, PREMIUM_AVATAR_KEYS.length);
 
-    for (let index = 0; index < Math.min(eligible.length, availableKeys.length); index += 1) {
-      const candidate = eligible[index];
-      const avatarKey = availableKeys[index];
+    const desiredClaims = new Map<number, string>();
+    const usedKeys = new Set<string>();
+
+    for (const entry of eligible) {
+      const existingKey = existingClaims.get(entry.id);
+      if (existingKey && PREMIUM_AVATAR_KEYS.includes(existingKey) && !usedKeys.has(existingKey)) {
+        desiredClaims.set(entry.id, existingKey);
+        usedKeys.add(existingKey);
+      }
+    }
+
+    const availableKeys = PREMIUM_AVATAR_KEYS.filter((key) => !usedKeys.has(key));
+
+    for (const entry of eligible) {
+      if (desiredClaims.has(entry.id)) {
+        continue;
+      }
+
+      const avatarKey = availableKeys.shift();
+      if (!avatarKey) {
+        break;
+      }
+
+      desiredClaims.set(entry.id, avatarKey);
+    }
+
+    await this.databaseService.query(`DELETE FROM premium_avatar_claims;`);
+
+    for (const entry of eligible) {
+      const avatarKey = desiredClaims.get(entry.id);
+      if (!avatarKey) {
+        continue;
+      }
 
       await this.databaseService.query(
         `
           INSERT INTO premium_avatar_claims (user_id, premium_avatar_key)
-          VALUES ($1, $2)
-          ON CONFLICT DO NOTHING;
+          VALUES ($1, $2);
         `,
-        [candidate.id, avatarKey],
+        [entry.id, avatarKey],
       );
     }
   }

@@ -148,6 +148,7 @@ export default function DashboardPage() {
   const leaders = board?.leaders ?? [];
   const topTen = leaders.slice(0, 10);
   const others = leaders.slice(10);
+  const premiumCount = leaders.filter((leader) => leader.isPremium).length;
   const unlocks = useMemo(() => {
     const levels = [0, 2, 3, 4, 5];
     return levels.map((level, index) => {
@@ -200,7 +201,7 @@ export default function DashboardPage() {
         <header className="race-board-head">
           <div>
             <h1>Ranking en vivo</h1>
-            <p>Acierta resultados y gana la carrera.</p>
+            <p>Acierta resultados y gana la carrera. {premiumCount} premium activos.</p>
           </div>
           <div className="race-board-actions">
             <Link className="button button-secondary" href="/">
@@ -228,17 +229,23 @@ export default function DashboardPage() {
             } as CSSProperties;
 
             return (
-              <article className={`race-row ${tone}`} key={leader.id} style={style}>
+              <article className={`race-row ${tone} ${leader.isPremium ? 'is-premium' : ''}`} key={leader.id} style={style}>
                 <div className="race-rank">{leader.rank}</div>
                 <div className="race-runner">
-                  <img
-                    className="race-avatar"
-                    src={leader.avatarImage}
-                    alt={`Avatar ${leader.name}`}
-                  />
-                  <div>
-                    <strong>{leader.name}</strong>
-                    <span>{leader.streakLabel}</span>
+                  <div className={`race-avatar-wrap ${leader.isPremium ? 'is-premium' : ''}`}>
+                    <img
+                      className="race-avatar"
+                      src={leader.avatarImage}
+                      alt={`Avatar ${leader.name}`}
+                    />
+                    {leader.isPremium && <span className="premium-mark">P</span>}
+                  </div>
+                  <div className="race-runner-copy">
+                    <div className="race-name-line">
+                      <strong>{leader.name}</strong>
+                      {leader.isPremium && <span className="premium-pill">Premium</span>}
+                    </div>
+                    <span className="race-streak-label">{leader.streakLabel}</span>
                   </div>
                 </div>
                 <div className="race-points-box">
@@ -248,11 +255,9 @@ export default function DashboardPage() {
 
                 <div className="race-lane" aria-hidden="true">
                   <div className="race-progress" />
-                  <img
-                    className="race-avatar race-avatar-inline"
-                    src={leader.avatarImage}
-                    alt=""
-                  />
+                  <div className={`race-avatar-wrap race-avatar-inline ${leader.isPremium ? 'is-premium' : ''}`}>
+                    <img className="race-avatar" src={leader.avatarImage} alt="" />
+                  </div>
                 </div>
 
                 <div className="race-points-end">{leader.points} pts</div>
@@ -265,16 +270,22 @@ export default function DashboardPage() {
           <section className="race-rest">
             <div className="race-rest-head">
               <h2>Todos los participantes</h2>
-              <p>{others.length} participantes mas en formato compacto.</p>
+              <p>{others.length} participantes mas en formato compacto. Premium claros con badge dorado.</p>
             </div>
 
             <div className="race-rest-list">
               {others.map((leader) => (
-                <article className="race-rest-row" key={leader.id}>
+                <article className={`race-rest-row ${leader.isPremium ? 'is-premium' : ''}`} key={leader.id}>
                   <div className="race-rest-rank">#{leader.rank}</div>
-                  <img className="race-avatar race-avatar-small" src={leader.avatarImage} alt={`Avatar ${leader.name}`} />
+                  <div className={`race-avatar-wrap race-avatar-small-wrap ${leader.isPremium ? 'is-premium' : ''}`}>
+                    <img className="race-avatar race-avatar-small" src={leader.avatarImage} alt={`Avatar ${leader.name}`} />
+                    {leader.isPremium && <span className="premium-mark premium-mark-small">P</span>}
+                  </div>
                   <div className="race-rest-runner">
-                    <strong>{leader.name}</strong>
+                    <div className="race-rest-name-line">
+                      <strong>{leader.name}</strong>
+                      {leader.isPremium && <span className="premium-pill premium-pill-small">Premium</span>}
+                    </div>
                     <span>{leader.streakLabel}</span>
                   </div>
                   <div className="race-rest-points">{leader.points} pts</div>
