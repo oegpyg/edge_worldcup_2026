@@ -16,6 +16,8 @@ type LeaderItem = {
   avatarFrame: number;
   avatarImage: string;
   isPremium: boolean;
+  missStreak: number;
+  isFailStreak: boolean;
 };
 
 type LeaderboardPayload = {
@@ -94,6 +96,62 @@ function descriptionFromStreak(streakLevel: number) {
   }
 
   return 'Tu carrera comienza aqui.';
+}
+
+function comboModeLabel(points: number) {
+  if (points >= 23) {
+    return 'WORLD DOMINATION';
+  }
+
+  if (points >= 19) {
+    return 'EXECUTIONER';
+  }
+
+  if (points >= 16) {
+    return 'BRUTALITY MODE';
+  }
+
+  if (points >= 13) {
+    return 'FATAL STRIKE';
+  }
+
+  if (points >= 10) {
+    return 'NO MERCY';
+  }
+
+  if (points >= 7) {
+    return 'COMBO STARTER';
+  }
+
+  if (points >= 4) {
+    return 'PREDATOR INSTINCT';
+  }
+
+  if (points >= 2) {
+    return 'WARM UP';
+  }
+
+  return 'DESCONECTADO';
+}
+
+const FAIL_MODE_LABELS = [
+  'Clown Mode Activated',
+  'Choke Artist',
+  'Almost Legendary',
+  'Pressure Folded You',
+  'Lag In Brain',
+  'Juice Drained',
+  'Racha Funeral',
+  'Misclick Supreme',
+];
+
+function failModeLabel(missStreak: number) {
+  if (missStreak < 2) {
+    return '';
+  }
+
+  const index = Math.min(FAIL_MODE_LABELS.length - 1, missStreak - 2);
+  return FAIL_MODE_LABELS[index] ?? FAIL_MODE_LABELS[0];
 }
 
 export default function DashboardPage() {
@@ -225,6 +283,8 @@ export default function DashboardPage() {
           {topTen.map((leader) => {
             const tone = laneTone(leader.rank);
             const hasFireAura = leader.points > 25;
+            const comboLabel = comboModeLabel(leader.points);
+            const failLabel = leader.isFailStreak ? failModeLabel(leader.missStreak) : '';
             const style = {
               '--progress': `${leader.progress}%`,
             } as CSSProperties;
@@ -246,7 +306,11 @@ export default function DashboardPage() {
                       <strong>{leader.name}</strong>
                       {leader.isPremium && <span className="premium-pill">Premium</span>}
                     </div>
-                    <span className="race-streak-label">{leader.streakLabel}</span>
+                    <div className="race-streak-line">
+                      <span className="race-streak-label">{leader.streakLabel}</span>
+                      <span className="mode-pill mode-pill-combo">{comboLabel}</span>
+                      {failLabel && <span className="mode-pill mode-pill-fail">{failLabel}</span>}
+                    </div>
                   </div>
                 </div>
                 <div className="race-points-box">
@@ -277,6 +341,8 @@ export default function DashboardPage() {
             <div className="race-rest-list">
               {others.map((leader) => {
                 const hasFireAura = leader.points > 25;
+                const comboLabel = comboModeLabel(leader.points);
+                const failLabel = leader.isFailStreak ? failModeLabel(leader.missStreak) : '';
 
                 return (
                 <article className={`race-rest-row ${leader.isPremium ? 'is-premium' : ''}`} key={leader.id}>
@@ -290,7 +356,11 @@ export default function DashboardPage() {
                       <strong>{leader.name}</strong>
                       {leader.isPremium && <span className="premium-pill premium-pill-small">Premium</span>}
                     </div>
-                    <span>{leader.streakLabel}</span>
+                    <div className="race-rest-streak-line">
+                      <span>{leader.streakLabel}</span>
+                      <span className="mode-pill mode-pill-combo mode-pill-small">{comboLabel}</span>
+                      {failLabel && <span className="mode-pill mode-pill-fail mode-pill-small">{failLabel}</span>}
+                    </div>
                   </div>
                   <div className="race-rest-points">{leader.points} pts</div>
                 </article>

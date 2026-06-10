@@ -1147,6 +1147,13 @@ input {
   text-transform: uppercase;
 }
 
+.race-rest-streak-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .race-rest-points {
   font-size: 16px;
   font-weight: 700;
@@ -1207,6 +1214,44 @@ input {
   color: #ffc07d;
   font-size: 12px;
   text-transform: uppercase;
+}
+
+.race-streak-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.mode-pill-combo {
+  border-color: rgba(88, 185, 255, 0.34);
+  background: rgba(88, 185, 255, 0.14);
+  color: #9dddff;
+}
+
+.mode-pill-fail {
+  border-color: rgba(255, 102, 102, 0.4);
+  background: rgba(255, 68, 68, 0.14);
+  color: #ffb1b1;
+}
+
+.mode-pill-small {
+  font-size: 9px;
+  padding: 1px 6px;
 }
 
 .premium-pill {
@@ -1746,6 +1791,11 @@ input {
 
   .race-streak-label {
     font-size: 11px;
+  }
+
+  .mode-pill {
+    font-size: 9px;
+    padding: 1px 5px;
   }
 
   .race-points-box strong,
