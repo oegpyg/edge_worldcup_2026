@@ -18,6 +18,40 @@ Tambien los finalistas y campeon del mundial.
 3. Obtener, almacenar y listar proximos partidos para soportar el recalculo continuo.
 4. Mostrar un dashboard en vivo con formato de carrera de puntos.
 
+## Cálculo de Clasificación de Países
+
+### Reglas de la Fase de Grupos
+
+- **48 selecciones** participan.
+- Se dividen en **12 grupos de 4 equipos**.
+- Cada selección juega **3 partidos** en su grupo.
+
+### ¿Quiénes clasifican a la siguiente ronda?
+
+Clasifican **32 selecciones**:
+
+- Los **2 primeros** de cada grupo → 12 × 2 = **24 equipos**.
+- Los **8 mejores terceros** entre los 12 grupos → **8 equipos**.
+
+**Total: 24 + 8 = 32 clasificados** a la fase eliminatoria
+
+
+
+
+Como cada equipo juega **3 partidos**, puede terminar con:
+
+| Resultado | Puntos |
+|-----------|--------|
+| 3 victorias | 9 |
+| 2 victorias, 1 empate | 7 |
+| 2 victorias, 1 derrota | 6 |
+| 1 victoria, 2 empates | 5 |
+| 1 victoria, 1 empate, 1 derrota | 4 |
+| 3 empates | 3 |
+| 1 victoria, 2 derrotas | 3 |
+| 1 empate, 2 derrotas | 1 |
+| 3 derrotas | 0 |
+
 ## Requisitos del dashboard en vivo
 
 - Vista tipo carrera: cada acierto suma puntos y el usuario con mayor puntaje avanza al frente.
