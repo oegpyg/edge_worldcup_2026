@@ -97,6 +97,7 @@ export function LoginForm() {
   const goalTimer = useRef<number | null>(null);
   const lockToastTimer = useRef<number | null>(null);
   const boardAttempt = Math.max(1, Math.min(otpMisses === 0 ? 1 : otpMisses, OTP_LOCK_LIMIT));
+  const latestShotIndex = Math.max(0, Math.min(otpMisses - 1, OTP_LOCK_LIMIT - 1));
 
   useEffect(() => {
     return () => {
@@ -279,9 +280,10 @@ export function LoginForm() {
                 <div className="penalty-track" aria-hidden="true">
                   {Array.from({ length: OTP_LOCK_LIMIT }).map((_, index) => {
                     const state = getPenaltySlotState('rival', index, otpMisses, OTP_LOCK_LIMIT);
+                    const shouldAnimate = state !== 'empty' && index === latestShotIndex;
                     return (
                       <span
-                        className={`penalty-slot penalty-slot-${state}`}
+                        className={`penalty-slot penalty-slot-rival penalty-slot-${state}${shouldAnimate ? ' penalty-slot-animate' : ''}`}
                         key={`rival-${index}-${state}`}
                       >
                         {getPenaltySymbol(state)}
@@ -296,8 +298,12 @@ export function LoginForm() {
                 <div className="penalty-track" aria-hidden="true">
                   {Array.from({ length: OTP_LOCK_LIMIT }).map((_, index) => {
                     const state = getPenaltySlotState('you', index, otpMisses, OTP_LOCK_LIMIT);
+                    const shouldAnimate = state !== 'empty' && index === latestShotIndex;
                     return (
-                      <span className={`penalty-slot penalty-slot-${state}`} key={`you-${index}-${state}`}>
+                      <span
+                        className={`penalty-slot penalty-slot-you penalty-slot-${state}${shouldAnimate ? ' penalty-slot-animate' : ''}`}
+                        key={`you-${index}-${state}`}
+                      >
                         {getPenaltySymbol(state)}
                       </span>
                     );

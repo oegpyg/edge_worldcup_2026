@@ -458,11 +458,6 @@ input {
   border-color: rgba(52, 211, 153, 0.6);
   background: rgba(52, 211, 153, 0.2);
   color: #b9ffd8;
-  animation: penalty-pop-flash 420ms cubic-bezier(0.16, 0.92, 0.36, 1);
-}
-
-.penalty-slot-scored::after {
-  animation: penalty-flash 430ms ease-out;
 }
 
 .penalty-slot-missed {
@@ -470,11 +465,34 @@ input {
   border-color: rgba(251, 113, 133, 0.65);
   background: rgba(251, 113, 133, 0.2);
   color: #ffd1d8;
+}
+
+.penalty-slot-animate.penalty-slot-scored,
+.penalty-slot-animate.penalty-slot-missed {
   animation: penalty-pop-flash 420ms cubic-bezier(0.16, 0.92, 0.36, 1);
 }
 
-.penalty-slot-missed::after {
+.penalty-slot-animate.penalty-slot-scored::after,
+.penalty-slot-animate.penalty-slot-missed::after {
   animation: penalty-flash 430ms ease-out;
+}
+
+.penalty-slot-rival.penalty-slot-animate {
+  animation-delay: 0ms;
+  animation-duration: 480ms;
+}
+
+.penalty-slot-rival.penalty-slot-animate::after {
+  animation-delay: 0ms;
+  animation-duration: 500ms;
+}
+
+.penalty-slot-you.penalty-slot-animate {
+  animation-delay: 900ms;
+}
+
+.penalty-slot-you.penalty-slot-animate::after {
+  animation-delay: 900ms;
 }
 
 @keyframes penalty-pop-flash {
