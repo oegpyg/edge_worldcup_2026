@@ -108,7 +108,11 @@ function loadFallbackCountries() {
 export class BackofficeService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  async importOfficialsFromCsv(adminToken: string | undefined, csvContent: string) {
+  async importOfficialsFromCsv(
+    adminToken: string | undefined,
+    csvContent: string,
+    clearPreviousData = false,
+  ) {
     this.assertAdminToken(adminToken);
 
     const parsed = this.parseOfficialsCsv(csvContent);
@@ -120,6 +124,44 @@ export class BackofficeService {
     const emails = parsed.rows.map((row) => row.email);
     const names = parsed.rows.map((row) => row.fullName);
     const sexes = parsed.rows.map((row) => row.sex);
+
+    if (clearPreviousData) {
+      await this.databaseService.query('BEGIN;');
+
+      try {
+        await this.databaseService.query('DELETE FROM users;');
+
+        const insertResult = await this.databaseService.query<UserEmailRow>(
+          `
+            INSERT INTO users (email, full_name, sex)
+            SELECT email, full_name, sex
+            FROM unnest($1::text[], $2::text[], $3::text[]) AS source(email, full_name, sex)
+            RETURNING email;
+          `,
+          [emails, names, sexes],
+        );
+
+        await this.databaseService.query('COMMIT;');
+
+        return {
+          success: true,
+          processedRows: parsed.processedRows,
+          validRows: parsed.rows.length,
+          createdUsers: insertResult.rowCount ?? parsed.rows.length,
+          updatedUsers: 0,
+          alreadyExisting: 0,
+          ignoredRows: parsed.ignoredRows,
+          invalidRows: parsed.invalidRows,
+          invalidSexRows: parsed.invalidSexRows,
+          duplicatesInFile: parsed.duplicatesInFile,
+          clearPreviousData: true,
+          message: 'Importacion CSV completada. Datos anteriores limpiados.',
+        };
+      } catch (error) {
+        await this.databaseService.query('ROLLBACK;');
+        throw error;
+      }
+    }
 
     const existingResult = await this.databaseService.query<CountRow>(
       `
@@ -162,6 +204,7 @@ export class BackofficeService {
       invalidRows: parsed.invalidRows,
       invalidSexRows: parsed.invalidSexRows,
       duplicatesInFile: parsed.duplicatesInFile,
+      clearPreviousData: false,
       message: 'Importacion CSV completada.',
     };
   }

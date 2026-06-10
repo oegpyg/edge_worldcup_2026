@@ -51,7 +51,7 @@ export class BackofficeController {
     @Headers('x-admin-token') adminToken: string | undefined,
     @Body() body: ImportOfficialsCsvDto,
   ) {
-    return this.backofficeService.importOfficialsFromCsv(adminToken, body.csvContent);
+    return this.backofficeService.importOfficialsFromCsv(adminToken, body.csvContent, body.clearPreviousData);
   }
 
   @Get('prediction-lock')

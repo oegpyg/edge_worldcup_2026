@@ -30,6 +30,7 @@ export default function BackofficeOfficialsPage() {
   const [notice, setNotice] = useState('');
   const [adminToken, setAdminToken] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [clearPreviousData, setClearPreviousData] = useState(false);
 
   useEffect(() => {
     const token = window.localStorage.getItem(ADMIN_TOKEN_KEY);
@@ -90,7 +91,7 @@ export default function BackofficeOfficialsPage() {
           'content-type': 'application/json',
           'x-admin-token': adminToken,
         },
-        body: JSON.stringify({ csvContent }),
+        body: JSON.stringify({ csvContent, clearPreviousData }),
       });
 
       if (!response.ok) {
@@ -111,12 +112,14 @@ export default function BackofficeOfficialsPage() {
         invalidRows: number;
         invalidSexRows: number;
         duplicatesInFile: number;
+        clearPreviousData: boolean;
       };
 
       setNotice(
-        `Importacion ok: ${payload.createdUsers} nuevos, ${payload.updatedUsers} actualizados, ${payload.alreadyExisting} existentes, ${payload.invalidRows} emails invalidos, ${payload.invalidSexRows} sexos invalidos, ${payload.duplicatesInFile} duplicados.`,
+        `Importacion ok: ${payload.createdUsers} nuevos, ${payload.updatedUsers} actualizados, ${payload.alreadyExisting} existentes, ${payload.invalidRows} emails invalidos, ${payload.invalidSexRows} sexos invalidos, ${payload.duplicatesInFile} duplicados${payload.clearPreviousData ? ' y datos anteriores limpiados' : ''}.`,
       );
       setCsvFile(null);
+      setClearPreviousData(false);
       await loadOfficials();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo importar el CSV.';
@@ -169,6 +172,14 @@ export default function BackofficeOfficialsPage() {
             Importar CSV
           </button>
         </div>
+        <label className="small import-flag">
+          <input
+            type="checkbox"
+            checked={clearPreviousData}
+            onChange={(event) => setClearPreviousData(event.target.checked)}
+          />
+          Limpiar datos anteriores antes de importar
+        </label>
         <p className="small">CSV esperado: email, nombre y sexo. Encabezados validos: email/correo, nombre/name, sexo/sex.</p>
 
         <div className="table-wrap">
