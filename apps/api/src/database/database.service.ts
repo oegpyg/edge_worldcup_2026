@@ -126,6 +126,38 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       );
     `);
 
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS user_scoring_state (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        last_points INTEGER NOT NULL DEFAULT 0,
+        miss_streak INTEGER NOT NULL DEFAULT 0,
+        last_results_version TEXT NOT NULL DEFAULT 'no-results',
+        fail_avatar_key TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE user_scoring_state
+      ADD COLUMN IF NOT EXISTS last_points INTEGER NOT NULL DEFAULT 0;
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE user_scoring_state
+      ADD COLUMN IF NOT EXISTS miss_streak INTEGER NOT NULL DEFAULT 0;
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE user_scoring_state
+      ADD COLUMN IF NOT EXISTS last_results_version TEXT NOT NULL DEFAULT 'no-results';
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE user_scoring_state
+      ADD COLUMN IF NOT EXISTS fail_avatar_key TEXT;
+    `);
+
     this.logger.log('Database schema ready');
   }
 

@@ -24,9 +24,28 @@ type PremiumClaimRow = {
   claimed_at: string;
 };
 
+type ResultsVersionRow = {
+  results_version: string;
+};
+
+type UserScoringStateRow = {
+  user_id: number;
+  last_points: number;
+  miss_streak: number;
+  last_results_version: string;
+  fail_avatar_key: string | null;
+};
+
 const DASHBOARD_GOAL_POINTS = 32;
 const PREMIUM_THRESHOLD = 25;
+const MISS_STREAK_FAIL_THRESHOLD = 2;
 const PREMIUM_AVATAR_KEYS = Array.from({ length: 10 }, (_, index) => `user_avatars_premium${index + 1}.png`);
+const FAIL_AVATAR_KEYS = [
+  'user_avatar_fail1.png',
+  'user_avatar_fail2.png',
+  'user_avatar_fail3.png',
+  'user_avatar_fail4.png',
+];
 
 function normalizeName(email: string) {
   const local = email.split('@')[0] ?? email;
@@ -155,9 +174,29 @@ export class AppController {
         JOIN wc_countries hc ON hc.id = m.home_country_id
         JOIN wc_countries ac ON ac.id = m.away_country_id
         WHERE m.home_score IS NOT NULL
-          AND m.away_score IS NOT NULL;
+          AND m.away_score IS NOT NULL
+        ORDER BY m.id ASC;
       `,
     );
+
+    const resultsVersionResult = await this.databaseService.query<ResultsVersionRow>(
+      `
+        SELECT
+          COALESCE(
+            MD5(
+              STRING_AGG(
+                CONCAT(id::text, ':', home_score::text, ':', away_score::text, ':', COALESCE(result_updated_at::text, '')),
+                '|' ORDER BY id
+              )
+            ),
+            'no-results'
+          ) AS results_version
+        FROM wc_matches
+        WHERE home_score IS NOT NULL
+          AND away_score IS NOT NULL;
+      `,
+    );
+    const resultsVersion = resultsVersionResult.rows[0]?.results_version ?? 'no-results';
 
     const teamPoints = new Map<string, number>();
 
@@ -227,15 +266,30 @@ export class AppController {
       });
 
     await this.syncPremiumAvatars(scoredLeaders);
+    const failStreakMap = await this.syncFailStreakState(scoredLeaders, resultsVersion);
     const premiumClaimMap = await this.readPremiumClaimMap();
 
     const leaders = scoredLeaders
       .map((entry) => {
+        const failState = failStreakMap.get(entry.id);
+        const failAvatarKey = failState?.failAvatarKey;
         const premiumKey = premiumClaimMap.get(entry.id);
+
+        let avatarImage = entry.avatarImage;
+        if (premiumKey) {
+          avatarImage = `/avatars/premium/${premiumKey}`;
+        }
+
+        if (failAvatarKey) {
+          avatarImage = `/avatars/fails/${failAvatarKey}`;
+        }
+
         return {
           ...entry,
-          avatarImage: premiumKey ? `/avatars/premium/${premiumKey}` : entry.avatarImage,
+          avatarImage,
           isPremium: premiumKey != null,
+          missStreak: failState?.missStreak ?? 0,
+          isFailStreak: failAvatarKey != null,
         };
       })
       .map((entry, index) => ({
@@ -330,5 +384,82 @@ export class AppController {
     );
 
     return new Map(claimResult.rows.map((row) => [row.user_id, row.premium_avatar_key]));
+  }
+
+  private async syncFailStreakState(entries: Array<{ id: number; points: number }>, resultsVersion: string) {
+    const stateResult = await this.databaseService.query<UserScoringStateRow>(
+      `
+        SELECT user_id, last_points, miss_streak, last_results_version, fail_avatar_key
+        FROM user_scoring_state;
+      `,
+    );
+
+    const currentState = new Map(stateResult.rows.map((row) => [row.user_id, row]));
+    const nextState = new Map<number, { missStreak: number; failAvatarKey: string | null }>();
+
+    for (const entry of entries) {
+      const existing = currentState.get(entry.id);
+
+      if (!existing) {
+        await this.databaseService.query(
+          `
+            INSERT INTO user_scoring_state (user_id, last_points, miss_streak, last_results_version, fail_avatar_key)
+            VALUES ($1, $2, 0, $3, NULL)
+            ON CONFLICT (user_id)
+            DO UPDATE SET
+              last_points = EXCLUDED.last_points,
+              last_results_version = EXCLUDED.last_results_version,
+              updated_at = NOW();
+          `,
+          [entry.id, entry.points, resultsVersion],
+        );
+
+        nextState.set(entry.id, { missStreak: 0, failAvatarKey: null });
+        continue;
+      }
+
+      if (existing.last_results_version === resultsVersion) {
+        nextState.set(entry.id, {
+          missStreak: existing.miss_streak,
+          failAvatarKey: existing.fail_avatar_key,
+        });
+        continue;
+      }
+
+      const pointsIncreased = entry.points > existing.last_points;
+      const pointsDecreased = entry.points < existing.last_points;
+      const nextMissStreak = pointsIncreased ? 0 : pointsDecreased ? existing.miss_streak + 1 : 0;
+      const nextFailAvatarKey =
+        nextMissStreak >= MISS_STREAK_FAIL_THRESHOLD
+          ? existing.fail_avatar_key ?? this.pickRandomFailAvatarKey()
+          : null;
+
+      await this.databaseService.query(
+        `
+          INSERT INTO user_scoring_state (user_id, last_points, miss_streak, last_results_version, fail_avatar_key)
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (user_id)
+          DO UPDATE SET
+            last_points = EXCLUDED.last_points,
+            miss_streak = EXCLUDED.miss_streak,
+            last_results_version = EXCLUDED.last_results_version,
+            fail_avatar_key = EXCLUDED.fail_avatar_key,
+            updated_at = NOW();
+        `,
+        [entry.id, entry.points, nextMissStreak, resultsVersion, nextFailAvatarKey],
+      );
+
+      nextState.set(entry.id, {
+        missStreak: nextMissStreak,
+        failAvatarKey: nextFailAvatarKey,
+      });
+    }
+
+    return nextState;
+  }
+
+  private pickRandomFailAvatarKey() {
+    const index = Math.floor(Math.random() * FAIL_AVATAR_KEYS.length);
+    return FAIL_AVATAR_KEYS[index] ?? FAIL_AVATAR_KEYS[0];
   }
 }

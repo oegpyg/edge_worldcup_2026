@@ -32,11 +32,41 @@ Implementacion base del concurso interno para predecir paises del Mundial 2026, 
 
 ## Como levantar
 
+### Preparar variables de entorno
+
+Este proyecto ahora usa archivos `.env` para todas las variables de Docker Compose.
+
+Perfiles disponibles:
+
+- `.env.dev` para desarrollo local.
+- `.env.prod` para perfil productivo/local de validacion.
+- `.env.example` como base general.
+
+Si quieres el perfil clasico con `.env`, crea uno desde el ejemplo:
+
+```bash
+cp .env.example .env
+```
+
 ### Con Docker Compose (recomendado)
 
 ```bash
 cd /Users/og/Developer/edge_worldcup_2026
 docker compose up -d
+```
+
+Con perfil de desarrollo explicito:
+
+```bash
+cd /Users/og/Developer/edge_worldcup_2026
+docker compose --env-file .env.dev up -d
+```
+
+Con perfil productivo explicito:
+
+```bash
+cd /Users/og/Developer/edge_worldcup_2026
+docker compose --env-file .env.prod up -d
 ```
 
 Espera 2-3 segundos a que se estabilicen los servicios:
@@ -52,7 +82,7 @@ Si quieres ver cambios de `apps/web` sin rebuild por cada edicion, usa el compos
 
 ```bash
 cd /Users/og/Developer/edge_worldcup_2026
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
 En este modo, el servicio `web` corre con `next dev` y monta el codigo local como volumen.
@@ -61,7 +91,7 @@ Cada cambio en `apps/web` se refleja en http://localhost:3000 sin reiniciar cont
 Para detener este modo:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml down
 ```
 
 ### Local (desarrollo)
@@ -131,7 +161,7 @@ Respuesta:
 
 ## Configuracion del Entorno
 
-Variables de entorno en `docker-compose.yml` (editar segun necesidad):
+Variables de entorno en `.env.dev` o `.env.prod` (editar segun necesidad):
 
 **Base de datos:**
 - `POSTGRES_DB`: edge_worldcup
