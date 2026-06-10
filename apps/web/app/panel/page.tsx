@@ -116,6 +116,10 @@ export default function UserPanelPage() {
       }));
   }, [countries]);
 
+  const countryByCode = useMemo(() => {
+    return new Map(countries.map((country) => [country.code, country]));
+  }, [countries]);
+
   function getFlag(code: string) {
     return FLAG_BY_CODE[code] ?? '🏳️';
   }
@@ -160,11 +164,21 @@ export default function UserPanelPage() {
   function toggleQualified(code: string) {
     setNotice('');
     setQualifiedCodes((current) => {
+      const targetCountry = countryByCode.get(code);
+
       if (current.includes(code)) {
         const next = current.filter((item) => item !== code);
         setFinalistCodes((finalists) => finalists.filter((item) => item !== code));
         setChampionCode((champion) => (champion === code ? '' : champion));
         return next;
+      }
+
+      if (targetCountry) {
+        const selectedInGroup = current.filter((item) => countryByCode.get(item)?.groupName === targetCountry.groupName).length;
+        if (selectedInGroup >= 3) {
+          setNotice(`Solo puedes elegir 3 paises del grupo ${targetCountry.groupName}.`);
+          return current;
+        }
       }
 
       if (current.length >= 32) {
@@ -284,13 +298,13 @@ export default function UserPanelPage() {
                 <section className="group-box" key={group.groupName}>
                   <header className="group-head">
                     <strong>Grupo {group.groupName}</strong>
-                    <span className="group-count">{selectedInGroup}/{group.teams.length}</span>
+                    <span className="group-count">{selectedInGroup}/3 max</span>
                   </header>
 
                   <div className="group-country-grid">
                     {group.teams.map((country) => {
                       const isSelected = qualifiedSet.has(country.code);
-                      const isDisabled = !isSelected && qualifiedCodes.length >= 32;
+                      const isDisabled = !isSelected && (qualifiedCodes.length >= 32 || selectedInGroup >= 3);
                       const cardClassName = [
                         'country-item',
                         isSelected ? 'is-selected' : '',

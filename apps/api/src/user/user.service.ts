@@ -111,6 +111,16 @@ export class UserService {
       throw new BadRequestException('Uno o mas codigos de pais no existen en el mundial cargado.');
     }
 
+    const groupCounts = new Map<string, number>();
+    for (const country of validCountries.rows) {
+      const nextCount = (groupCounts.get(country.group_name) ?? 0) + 1;
+      groupCounts.set(country.group_name, nextCount);
+
+      if (nextCount > 3) {
+        throw new BadRequestException('Solo puedes elegir maximo 3 paises por grupo.');
+      }
+    }
+
     await this.databaseService.query(
       `
         INSERT INTO user_predictions (user_id, qualified_codes, finalist_codes, champion_code)

@@ -242,7 +242,7 @@ export default function DashboardPage() {
           </article>
           <article className="race-metrics-logo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/edge-logo.svg" alt="Edge" className="topbar-edge-logo" />
+            <img src="/edgelogo.svg" alt="Edge" className="topbar-edge-logo" />
           </article>
         </div>
 

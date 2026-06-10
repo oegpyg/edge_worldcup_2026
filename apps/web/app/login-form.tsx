@@ -222,7 +222,7 @@ export function LoginForm() {
       <div className="auth-header">
         <div className="brand-row">
           <Image
-            src="/images/edge-logo.svg"
+            src="/edgelogo.svg"
             alt="Edge"
             width={120}
             height={34}
