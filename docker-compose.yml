@@ -40,6 +40,7 @@ services:
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_IGNORE_TLS: ${SMTP_IGNORE_TLS}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
@@ -56,6 +57,8 @@ services:
   web:
     build:
       context: ./apps/web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: edge-worldcup-web
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}

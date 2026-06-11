@@ -14,9 +14,12 @@ export class MailService {
   }
 
   private readonly transporter = nodemailer.createTransport({
+    // Useful for SMTP relays that do not require auth and/or use non-standard TLS setup.
     host: process.env.SMTP_HOST ?? 'localhost',
     port: Number(process.env.SMTP_PORT ?? 1025),
     secure: this.readBool(process.env.SMTP_SECURE, false),
+    ignoreTLS: this.readBool(process.env.SMTP_IGNORE_TLS, false),
+    tls: this.readBool(process.env.SMTP_IGNORE_TLS, false) ? { rejectUnauthorized: false } : undefined,
     auth:
       process.env.SMTP_USER && process.env.SMTP_PASSWORD
         ? {
