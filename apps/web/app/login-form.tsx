@@ -86,6 +86,7 @@ export function LoginForm() {
   const [authState, setAuthState] = useState<AuthState>('request');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -96,6 +97,7 @@ export function LoginForm() {
   const [showLockToast, setShowLockToast] = useState(false);
   const goalTimer = useRef<number | null>(null);
   const lockToastTimer = useRef<number | null>(null);
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const boardAttempt = Math.max(1, Math.min(otpMisses === 0 ? 1 : otpMisses, OTP_LOCK_LIMIT));
   const latestShotIndex = Math.max(0, Math.min(otpMisses - 1, OTP_LOCK_LIMIT - 1));
 
@@ -133,9 +135,13 @@ export function LoginForm() {
       setOtpMisses(0);
       setOtpLocked(false);
       setShowLockToast(false);
+      setOtpDigits(['', '', '', '', '', '']);
       setStatus('OTP enviado. Revisa tu mail o Mailpit en localhost:8025.');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Error enviando OTP');
+      const errorMsg = requestError instanceof Error ? requestError.message : 'Error enviando OTP';
+      const isNotOfficial = errorMsg.includes('Email no registrado');
+      const fullError = isNotOfficial ? `${errorMsg}\nRecibiste una tarjeta roja` : errorMsg;
+      setError(fullError);
       setStatus('');
     } finally {
       setIsSubmitting(false);
@@ -174,6 +180,7 @@ export function LoginForm() {
             setAuthState('request');
             setEmail('');
             setOtp('');
+            setOtpDigits(['', '', '', '', '', '']);
             setOtpMisses(0);
             setOtpLocked(false);
             setStatus('');
@@ -325,16 +332,41 @@ export function LoginForm() {
           </label>
           <label className="label">
             Codigo OTP
-            <input
-              className="input"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]{6}"
-              placeholder="123456"
-              value={otp}
-              onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
-              required
-            />
+            <div className="otp-input-grid">
+              {otpDigits.map((digit, index) => (
+                <input
+                  key={`otp-${index}`}
+                  ref={(el) => {
+                    otpInputRefs.current[index] = el;
+                  }}
+                  className="otp-input-box"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(event) => {
+                    const value = event.target.value.replace(/\D/g, '');
+                    if (value.length <= 1) {
+                      const newDigits = [...otpDigits];
+                      newDigits[index] = value;
+                      setOtpDigits(newDigits);
+                      setOtp(newDigits.join(''));
+                      if (value && index < 5) {
+                        otpInputRefs.current[index + 1]?.focus();
+                      }
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Backspace') {
+                      if (!digit && index > 0) {
+                        otpInputRefs.current[index - 1]?.focus();
+                      }
+                    }
+                  }}
+                  placeholder="•"
+                />
+              ))}
+            </div>
           </label>
           <div className="button-row">
             <button className="button button-primary" type="submit" disabled={isSubmitting}>
@@ -347,6 +379,7 @@ export function LoginForm() {
               onClick={() => {
                 setAuthState('request');
                 setOtp('');
+                setOtpDigits(['', '', '', '', '', '']);
                 setOtpMisses(0);
                 setOtpLocked(false);
                 setShowLockToast(false);

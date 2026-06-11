@@ -373,6 +373,38 @@ input {
   color: #ffd289;
 }
 
+.otp-input-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.otp-input-box {
+  width: 100%;
+  aspect-ratio: 1;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  padding: 0;
+}
+
+.otp-input-box:focus {
+  outline: none;
+  border-color: rgba(52, 211, 153, 0.6);
+  background: rgba(52, 211, 153, 0.1);
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.3);
+}
+
+.otp-input-box::placeholder {
+  color: var(--muted);
+  opacity: 0.5;
+}
+
 .penalty-board {
   margin-top: 14px;
   border-radius: 18px;

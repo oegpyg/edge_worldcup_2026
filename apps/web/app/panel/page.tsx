@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
@@ -12,6 +13,14 @@ type Country = {
   name: string;
   groupName: string;
 };
+
+type Prediction = {
+  qualifiedCodes: string[];
+  finalistCodes: string[];
+  championCode: string;
+} | null;
+
+type PredictionStage = 'stage1' | 'stage2' | 'readonly';
 
 const FLAG_BY_CODE: Record<string, string> = {
   CAN: '🇨🇦',
@@ -64,12 +73,6 @@ const FLAG_BY_CODE: Record<string, string> = {
   TUR: '🇹🇷',
 };
 
-type Prediction = {
-  qualifiedCodes: string[];
-  finalistCodes: string[];
-  championCode: string;
-} | null;
-
 export default function UserPanelPage() {
   const router = useRouter();
   const [countries, setCountries] = useState<Country[]>([]);
@@ -79,6 +82,9 @@ export default function UserPanelPage() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [sessionToken, setSessionToken] = useState('');
+  const [predictionStage, setPredictionStage] = useState<PredictionStage>('stage1');
+  const [stage1LockAt, setStage1LockAt] = useState<string | null>(null);
+  const [stage2LockAt, setStage2LockAt] = useState<string | null>(null);
 
   useEffect(() => {
     const token = window.localStorage.getItem(SESSION_TOKEN_KEY);
@@ -93,6 +99,8 @@ export default function UserPanelPage() {
   }, []);
 
   const qualifiedSet = useMemo(() => new Set(qualifiedCodes), [qualifiedCodes]);
+  const isStage1 = predictionStage === 'stage1';
+  const isStage2 = predictionStage === 'stage2';
 
   const finalistOptions = useMemo(
     () => countries.filter((country) => qualifiedSet.has(country.code)),
@@ -138,12 +146,17 @@ export default function UserPanelPage() {
       const payload = (await response.json()) as {
         countries: Country[];
         prediction: Prediction;
-        predictionLocked: boolean;
-        predictionLockAt: string | null;
+        predictionStage: PredictionStage;
+        predictionStage1LockAt: string | null;
+        predictionStage2LockAt: string | null;
       };
 
       setCountries(payload.countries);
-      if (payload.predictionLocked) {
+      setPredictionStage(payload.predictionStage);
+      setStage1LockAt(payload.predictionStage1LockAt);
+      setStage2LockAt(payload.predictionStage2LockAt);
+
+      if (payload.predictionStage === 'readonly') {
         router.replace('/panel/readonly');
         return;
       }
@@ -152,6 +165,12 @@ export default function UserPanelPage() {
         setQualifiedCodes(payload.prediction.qualifiedCodes);
         setFinalistCodes(payload.prediction.finalistCodes);
         setChampionCode(payload.prediction.championCode);
+      }
+
+      if (payload.predictionStage === 'stage1') {
+        setNotice(payload.prediction ? 'Etapa 1 habilitada: puedes editar los 32 clasificados.' : 'Etapa 1 habilitada: selecciona tus 32 clasificados.');
+      } else {
+        setNotice('Etapa 2 habilitada: define finalistas y campeon.');
       }
     } catch {
       window.localStorage.removeItem(SESSION_TOKEN_KEY);
@@ -162,6 +181,10 @@ export default function UserPanelPage() {
   }
 
   function toggleQualified(code: string) {
+    if (!isStage1) {
+      return;
+    }
+
     setNotice('');
     setQualifiedCodes((current) => {
       const targetCountry = countryByCode.get(code);
@@ -191,6 +214,10 @@ export default function UserPanelPage() {
   }
 
   function updateFinalist(slot: 0 | 1, code: string) {
+    if (!isStage2) {
+      return;
+    }
+
     setFinalistCodes((current) => {
       const next = [...current];
       next[slot] = code;
@@ -215,19 +242,22 @@ export default function UserPanelPage() {
     }
 
     const cleanFinalists = finalistCodes.filter((item) => item);
-    if (cleanFinalists.length !== 2) {
-      setNotice('Debes elegir 2 finalistas.');
-      return;
-    }
 
-    if (!championCode) {
-      setNotice('Debes elegir campeon.');
-      return;
-    }
+    if (isStage2) {
+      if (cleanFinalists.length !== 2) {
+        setNotice('Debes elegir 2 finalistas.');
+        return;
+      }
 
-    if (!cleanFinalists.includes(championCode)) {
-      setNotice('El campeon debe ser uno de los finalistas.');
-      return;
+      if (!championCode) {
+        setNotice('Debes elegir campeon.');
+        return;
+      }
+
+      if (!cleanFinalists.includes(championCode)) {
+        setNotice('El campeon debe ser uno de los finalistas.');
+        return;
+      }
     }
 
     try {
@@ -240,8 +270,8 @@ export default function UserPanelPage() {
         },
         body: JSON.stringify({
           qualifiedCodes,
-          finalistCodes: cleanFinalists,
-          championCode,
+          finalistCodes: isStage2 ? cleanFinalists : undefined,
+          championCode: isStage2 ? championCode : undefined,
         }),
       });
 
@@ -253,7 +283,9 @@ export default function UserPanelPage() {
         throw new Error(msg);
       }
 
-      router.replace('/panel/readonly?status=saved');
+      const payload = (await response.json()) as { stage?: string; message?: string };
+      setNotice(payload.message ?? (isStage2 ? 'Etapa 2 guardada.' : 'Etapa 1 guardada.'));
+      await loadPanel(sessionToken);
     } catch (saveError) {
       setNotice(saveError instanceof Error ? saveError.message : 'No se pudo guardar prediccion.');
     } finally {
@@ -265,9 +297,18 @@ export default function UserPanelPage() {
     <main className="user-panel-shell">
       <section className="panel user-panel-head">
         <div>
+          <Image src="/edgelogo.svg" alt="Edge" width={120} height={34} priority className="edge-logo" />
           <span className="eyebrow">Panel de usuario</span>
           <h1>Tu prediccion del Mundial</h1>
-          <p>Selecciona 32 clasificados, 2 finalistas y el campeon.</p>
+          <p>
+            {isStage1
+              ? 'Etapa 1: selecciona los 32 clasificados.'
+              : 'Etapa 2: selecciona finalistas y campeon.'}
+          </p>
+          <p className="small">
+            Etapa 1 cierra: {stage1LockAt ? new Date(stage1LockAt).toLocaleString() : 'sin fecha'} · Etapa 2 cierra:{' '}
+            {stage2LockAt ? new Date(stage2LockAt).toLocaleString() : 'sin fecha'}
+          </p>
         </div>
         <div className="button-row">
           <Link className="button button-secondary" href="/backoffice/login">
@@ -290,6 +331,7 @@ export default function UserPanelPage() {
         <section className="panel user-panel-card user-panel-card-bottom">
           <h2>Clasificados a siguiente ronda</h2>
           <p>{qualifiedCodes.length}/32 seleccionados</p>
+          {!isStage1 ? <p className="small">Etapa 1 cerrada. Los 32 clasificados quedan en solo lectura.</p> : null}
           <div className="country-groups">
             {groupedCountries.map((group) => {
               const selectedInGroup = group.teams.filter((team) => qualifiedSet.has(team.code)).length;
@@ -304,7 +346,7 @@ export default function UserPanelPage() {
                   <div className="group-country-grid">
                     {group.teams.map((country) => {
                       const isSelected = qualifiedSet.has(country.code);
-                      const isDisabled = !isSelected && (qualifiedCodes.length >= 32 || selectedInGroup >= 3);
+                      const isDisabled = !isStage1 || (!isSelected && (qualifiedCodes.length >= 32 || selectedInGroup >= 3));
                       const cardClassName = [
                         'country-item',
                         isSelected ? 'is-selected' : '',
@@ -337,6 +379,7 @@ export default function UserPanelPage() {
 
         <section className="panel user-panel-card user-panel-card-top">
           <h2>Final y campeon</h2>
+          {!isStage2 ? <p className="small">Etapa 2 aun no habilitada. Se activa cuando cierre etapa 1.</p> : null}
           <div className="form">
             <label className="label">
               Finalista 1
@@ -344,6 +387,7 @@ export default function UserPanelPage() {
                 className="input"
                 value={finalistCodes[0] ?? ''}
                 onChange={(event) => updateFinalist(0, event.target.value)}
+                disabled={!isStage2}
               >
                 <option value="">Selecciona</option>
                 {finalistOptions.map((country) => (
@@ -360,6 +404,7 @@ export default function UserPanelPage() {
                 className="input"
                 value={finalistCodes[1] ?? ''}
                 onChange={(event) => updateFinalist(1, event.target.value)}
+                disabled={!isStage2}
               >
                 <option value="">Selecciona</option>
                 {finalistOptions.map((country) => (
@@ -376,6 +421,7 @@ export default function UserPanelPage() {
                 className="input"
                 value={championCode}
                 onChange={(event) => setChampionCode(event.target.value)}
+                disabled={!isStage2}
               >
                 <option value="">Selecciona</option>
                 {finalistOptions
@@ -392,7 +438,7 @@ export default function UserPanelPage() {
 
         <div className="button-row user-panel-submit">
           <button className="button button-primary" type="submit" disabled={busy}>
-            Guardar prediccion
+            {isStage1 ? 'Guardar etapa 1' : 'Guardar etapa 2'}
           </button>
         </div>
       </form>

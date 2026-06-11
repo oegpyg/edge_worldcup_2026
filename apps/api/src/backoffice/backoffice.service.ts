@@ -133,8 +133,8 @@ export class BackofficeService {
 
         const insertResult = await this.databaseService.query<UserEmailRow>(
           `
-            INSERT INTO users (email, full_name, sex)
-            SELECT email, full_name, sex
+            INSERT INTO users (email, full_name, sex, is_official)
+            SELECT email, full_name, sex, true
             FROM unnest($1::text[], $2::text[], $3::text[]) AS source(email, full_name, sex)
             RETURNING email;
           `,
@@ -175,8 +175,8 @@ export class BackofficeService {
 
     const insertResult = await this.databaseService.query<UserEmailRow>(
       `
-        INSERT INTO users (email, full_name, sex)
-        SELECT email, full_name, sex
+        INSERT INTO users (email, full_name, sex, is_official)
+        SELECT email, full_name, sex, true
         FROM unnest($1::text[], $2::text[], $3::text[]) AS source(email, full_name, sex)
         ON CONFLICT (email)
         DO UPDATE SET
@@ -184,7 +184,8 @@ export class BackofficeService {
             WHEN EXCLUDED.full_name IS NOT NULL AND EXCLUDED.full_name <> '' THEN EXCLUDED.full_name
             ELSE users.full_name
           END,
-          sex = COALESCE(EXCLUDED.sex, users.sex)
+          sex = COALESCE(EXCLUDED.sex, users.sex),
+          is_official = true
         RETURNING email;
       `,
       [emails, names, sexes],
@@ -377,54 +378,84 @@ export class BackofficeService {
   async getPredictionLock(adminToken?: string) {
     this.assertAdminToken(adminToken);
 
-    const lockAt = await this.readPredictionLockAt();
+    const lockAt = await this.readPredictionStageLockAt(1);
+    const stage2LockAt = await this.readPredictionStageLockAt(2);
     return {
       lockAt,
+      stage2LockAt,
       locked: this.isPredictionLocked(lockAt),
+      stage2Locked: this.isPredictionLocked(stage2LockAt),
     };
   }
 
-  async setPredictionLock(adminToken: string | undefined, lockAtInput?: string) {
+  async setPredictionLock(adminToken: string | undefined, lockAtInput?: string, stage2LockAtInput?: string) {
     this.assertAdminToken(adminToken);
 
-    const normalized = lockAtInput?.trim() ?? '';
-    if (!normalized) {
+    const normalizedStage1 = lockAtInput?.trim() ?? '';
+    const normalizedStage2 = stage2LockAtInput?.trim() ?? '';
+
+    const stage1LockAt = normalizedStage1 ? this.parseLockAt(normalizedStage1) : null;
+    const stage2LockAt = normalizedStage2 ? this.parseLockAt(normalizedStage2) : null;
+
+    if (stage1LockAt && stage2LockAt && stage2LockAt <= stage1LockAt) {
+      throw new BadRequestException('La fecha de etapa 2 debe ser posterior a la fecha de etapa 1.');
+    }
+
+    if (!stage1LockAt) {
+      await this.databaseService.query(
+        `
+          DELETE FROM app_settings
+          WHERE setting_key IN ('prediction_stage1_lock_at', 'prediction_lock_at');
+        `,
+      );
+    } else {
+      await this.databaseService.query(
+        `
+          INSERT INTO app_settings (setting_key, setting_value, updated_at)
+          VALUES ('prediction_stage1_lock_at', $1, NOW())
+          ON CONFLICT (setting_key)
+          DO UPDATE SET
+            setting_value = EXCLUDED.setting_value,
+            updated_at = NOW();
+        `,
+        [stage1LockAt],
+      );
+
       await this.databaseService.query(
         `
           DELETE FROM app_settings
           WHERE setting_key = 'prediction_lock_at';
         `,
       );
-
-      return {
-        success: true,
-        lockAt: null,
-        locked: false,
-      };
     }
 
-    const parsed = new Date(normalized);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new BadRequestException('Fecha de cierre invalida. Usa fecha y hora validas.');
+    if (!stage2LockAt) {
+      await this.databaseService.query(
+        `
+          DELETE FROM app_settings
+          WHERE setting_key = 'prediction_stage2_lock_at';
+        `,
+      );
+    } else {
+      await this.databaseService.query(
+        `
+          INSERT INTO app_settings (setting_key, setting_value, updated_at)
+          VALUES ('prediction_stage2_lock_at', $1, NOW())
+          ON CONFLICT (setting_key)
+          DO UPDATE SET
+            setting_value = EXCLUDED.setting_value,
+            updated_at = NOW();
+        `,
+        [stage2LockAt],
+      );
     }
-
-    const lockAt = parsed.toISOString();
-    await this.databaseService.query(
-      `
-        INSERT INTO app_settings (setting_key, setting_value, updated_at)
-        VALUES ('prediction_lock_at', $1, NOW())
-        ON CONFLICT (setting_key)
-        DO UPDATE SET
-          setting_value = EXCLUDED.setting_value,
-          updated_at = NOW();
-      `,
-      [lockAt],
-    );
 
     return {
       success: true,
-      lockAt,
-      locked: this.isPredictionLocked(lockAt),
+      lockAt: stage1LockAt,
+      stage2LockAt,
+      locked: this.isPredictionLocked(stage1LockAt),
+      stage2Locked: this.isPredictionLocked(stage2LockAt),
     };
   }
 
@@ -1033,17 +1064,33 @@ export class BackofficeService {
     return null;
   }
 
-  private async readPredictionLockAt() {
+  private async readPredictionStageLockAt(stage: 1 | 2) {
+    const keys = stage === 1 ? ['prediction_stage1_lock_at', 'prediction_lock_at'] : ['prediction_stage2_lock_at'];
     const result = await this.databaseService.query<PredictionLockRow>(
       `
         SELECT setting_value
         FROM app_settings
-        WHERE setting_key = 'prediction_lock_at'
+        WHERE setting_key = ANY($1::text[])
+        ORDER BY CASE setting_key
+          WHEN 'prediction_stage1_lock_at' THEN 0
+          WHEN 'prediction_lock_at' THEN 1
+          ELSE 2
+        END
         LIMIT 1;
       `,
+      [keys],
     );
 
     return result.rows[0]?.setting_value ?? null;
+  }
+
+  private parseLockAt(value: string) {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Fecha de cierre invalida. Usa fecha y hora validas.');
+    }
+
+    return parsed.toISOString();
   }
 
   private isPredictionLocked(lockAt: string | null) {

@@ -46,6 +46,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     `);
 
     await this.pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS is_official BOOLEAN NOT NULL DEFAULT false;
+    `);
+
+    await this.pool.query(`
       CREATE TABLE IF NOT EXISTS otp_codes (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -112,11 +117,21 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         qualified_codes TEXT[] NOT NULL,
-        finalist_codes TEXT[] NOT NULL,
-        champion_code TEXT NOT NULL,
+        finalist_codes TEXT[],
+        champion_code TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE user_predictions
+      ALTER COLUMN finalist_codes DROP NOT NULL;
+    `);
+
+    await this.pool.query(`
+      ALTER TABLE user_predictions
+      ALTER COLUMN champion_code DROP NOT NULL;
     `);
 
     await this.pool.query(`

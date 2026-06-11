@@ -64,7 +64,7 @@ export class BackofficeController {
     @Headers('x-admin-token') adminToken: string | undefined,
     @Body() body: SetPredictionLockDto,
   ) {
-    return this.backofficeService.setPredictionLock(adminToken, body.lockAt);
+    return this.backofficeService.setPredictionLock(adminToken, body.lockAt, body.stage2LockAt);
   }
 
   @Post('demo-predictions')

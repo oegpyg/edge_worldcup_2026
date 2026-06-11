@@ -20,9 +20,12 @@ function toDatetimeLocalValue(isoValue: string | null) {
 
 export default function BackofficePredictionLockPage() {
   const router = useRouter();
-  const [lockAt, setLockAt] = useState('');
-  const [currentLockAt, setCurrentLockAt] = useState<string | null>(null);
-  const [locked, setLocked] = useState(false);
+  const [stage1LockAt, setStage1LockAt] = useState('');
+  const [stage2LockAt, setStage2LockAt] = useState('');
+  const [currentStage1LockAt, setCurrentStage1LockAt] = useState<string | null>(null);
+  const [currentStage2LockAt, setCurrentStage2LockAt] = useState<string | null>(null);
+  const [stage1Locked, setStage1Locked] = useState(false);
+  const [stage2Locked, setStage2Locked] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [adminToken, setAdminToken] = useState('');
@@ -58,26 +61,31 @@ export default function BackofficePredictionLockPage() {
           return;
         }
 
-        throw new Error('No se pudo cargar la fecha de cierre.');
+        throw new Error('No se pudieron cargar las fechas de etapas.');
       }
 
       const payload = (await response.json()) as {
         lockAt: string | null;
+        stage2LockAt: string | null;
         locked: boolean;
+        stage2Locked: boolean;
       };
 
-      setCurrentLockAt(payload.lockAt);
-      setLockAt(toDatetimeLocalValue(payload.lockAt));
-      setLocked(payload.locked);
+      setCurrentStage1LockAt(payload.lockAt);
+      setCurrentStage2LockAt(payload.stage2LockAt);
+      setStage1LockAt(toDatetimeLocalValue(payload.lockAt));
+      setStage2LockAt(toDatetimeLocalValue(payload.stage2LockAt));
+      setStage1Locked(payload.locked);
+      setStage2Locked(payload.stage2Locked);
       setNotice('');
     } catch {
-      setNotice('No se pudo cargar la fecha de cierre.');
+      setNotice('No se pudieron cargar las fechas de etapas.');
     } finally {
       setIsBusy(false);
     }
   }
 
-  async function saveLock() {
+  async function saveLocks() {
     if (!adminToken) {
       return;
     }
@@ -90,7 +98,10 @@ export default function BackofficePredictionLockPage() {
           'Content-Type': 'application/json',
           'x-admin-token': adminToken,
         },
-        body: JSON.stringify({ lockAt }),
+        body: JSON.stringify({
+          lockAt: stage1LockAt,
+          stage2LockAt,
+        }),
       });
 
       if (!response.ok) {
@@ -103,27 +114,20 @@ export default function BackofficePredictionLockPage() {
         const payload = (await response.json()) as { message?: string | string[] };
         const msg = Array.isArray(payload.message)
           ? payload.message.join(', ')
-          : payload.message ?? 'No se pudo guardar la fecha de cierre.';
+          : payload.message ?? 'No se pudieron guardar las fechas de etapas.';
         throw new Error(msg);
       }
 
-      const payload = (await response.json()) as {
-        lockAt: string | null;
-        locked: boolean;
-      };
-
-      setCurrentLockAt(payload.lockAt);
-      setLocked(payload.locked);
-      setLockAt(toDatetimeLocalValue(payload.lockAt));
-      setNotice(payload.locked ? 'La edicion quedo cerrada.' : 'La edicion quedo habilitada.');
+      await loadSettings();
+      setNotice('Fechas de etapas guardadas.');
     } catch (saveError) {
-      setNotice(saveError instanceof Error ? saveError.message : 'No se pudo guardar la fecha de cierre.');
+      setNotice(saveError instanceof Error ? saveError.message : 'No se pudieron guardar las fechas de etapas.');
     } finally {
       setIsBusy(false);
     }
   }
 
-  async function clearLock() {
+  async function clearStage(stage: 1 | 2) {
     if (!adminToken) {
       return;
     }
@@ -136,7 +140,10 @@ export default function BackofficePredictionLockPage() {
           'Content-Type': 'application/json',
           'x-admin-token': adminToken,
         },
-        body: JSON.stringify({ lockAt: '' }),
+        body: JSON.stringify({
+          lockAt: stage === 1 ? '' : stage1LockAt,
+          stage2LockAt: stage === 2 ? '' : stage2LockAt,
+        }),
       });
 
       if (!response.ok) {
@@ -149,21 +156,14 @@ export default function BackofficePredictionLockPage() {
         const payload = (await response.json()) as { message?: string | string[] };
         const msg = Array.isArray(payload.message)
           ? payload.message.join(', ')
-          : payload.message ?? 'No se pudo quitar la fecha de cierre.';
+          : payload.message ?? 'No se pudo limpiar la etapa.';
         throw new Error(msg);
       }
 
-      const payload = (await response.json()) as {
-        lockAt: string | null;
-        locked: boolean;
-      };
-
-      setCurrentLockAt(payload.lockAt);
-      setLocked(payload.locked);
-      setLockAt('');
-      setNotice('La edicion quedo habilitada.');
+      await loadSettings();
+      setNotice(stage === 1 ? 'Etapa 1 habilitada sin fecha.' : 'Etapa 2 habilitada sin fecha.');
     } catch (clearError) {
-      setNotice(clearError instanceof Error ? clearError.message : 'No se pudo quitar la fecha de cierre.');
+      setNotice(clearError instanceof Error ? clearError.message : 'No se pudo limpiar la etapa.');
     } finally {
       setIsBusy(false);
     }
@@ -174,8 +174,8 @@ export default function BackofficePredictionLockPage() {
       <section className="backoffice-head">
         <div>
           <span className="eyebrow">Admin Panel</span>
-          <h1>Cierre de edicion</h1>
-          <p>Define la fecha y hora a partir de la cual los usuarios pasan a solo lectura.</p>
+          <h1>Etapas de prediccion</h1>
+          <p>Configura cierre de etapa 1 (32 clasificados) y etapa 2 (finalistas/campeon).</p>
         </div>
         <div className="backoffice-actions">
           <Link className="button button-secondary" href="/backoffice">
@@ -195,34 +195,56 @@ export default function BackofficePredictionLockPage() {
       </section>
 
       <section className="panel backoffice-card">
-        <h2>Fecha de cierre</h2>
+        <h2>Cierres por etapa</h2>
         <p>
-          Estado actual: <strong>{locked ? 'cerrado' : 'abierto'}</strong>
-          {currentLockAt ? ` · Cierra el ${new Date(currentLockAt).toLocaleString()}` : ' · Sin fecha definida'}
+          Etapa 1: <strong>{stage1Locked ? 'cerrada' : 'abierta'}</strong>
+          {currentStage1LockAt ? ` · Cierra ${new Date(currentStage1LockAt).toLocaleString()}` : ' · Sin fecha'}
+        </p>
+        <p>
+          Etapa 2: <strong>{stage2Locked ? 'cerrada' : 'abierta'}</strong>
+          {currentStage2LockAt ? ` · Cierra ${new Date(currentStage2LockAt).toLocaleString()}` : ' · Sin fecha'}
         </p>
 
         <div className="form">
           <label className="label">
-            Fecha y hora de cierre
+            Fecha cierre etapa 1
             <input
               className="input"
               type="datetime-local"
-              value={lockAt}
-              onChange={(event) => setLockAt(event.target.value)}
+              value={stage1LockAt}
+              onChange={(event) => setStage1LockAt(event.target.value)}
+            />
+          </label>
+
+          <label className="label">
+            Fecha cierre etapa 2
+            <input
+              className="input"
+              type="datetime-local"
+              value={stage2LockAt}
+              onChange={(event) => setStage2LockAt(event.target.value)}
             />
           </label>
 
           <div className="button-row">
-            <button className="button button-primary" type="button" onClick={saveLock} disabled={isBusy}>
-              Guardar cierre
+            <button className="button button-primary" type="button" onClick={saveLocks} disabled={isBusy}>
+              Guardar fechas
             </button>
             <button
               className="button button-secondary"
               type="button"
-              onClick={clearLock}
+              onClick={() => void clearStage(1)}
               disabled={isBusy}
             >
-              Quitar cierre
+              Limpiar etapa 1
+            </button>
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={() => void clearStage(2)}
+              disabled={isBusy}
+            >
+              Limpiar etapa 2
             </button>
             <button
               className="button button-secondary"

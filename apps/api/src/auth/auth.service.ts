@@ -40,16 +40,20 @@ export class AuthService {
 
     await this.enforceRequestOtpLimits(normalizedEmail, ipAddress);
 
-    const userResult = await this.databaseService.query<UserRow>(
+    const existingUser = await this.databaseService.query<UserRow & { is_official: boolean }>(
       `
-        INSERT INTO users (email)
-        VALUES ($1)
-        ON CONFLICT (email)
-        DO UPDATE SET email = EXCLUDED.email
-        RETURNING id, email;
+        SELECT id, email, failed_otp_attempts, otp_locked_until, is_official
+        FROM users
+        WHERE email = $1;
       `,
       [normalizedEmail],
     );
+
+    if (existingUser.rows.length === 0 || !existingUser.rows[0].is_official) {
+      throw new BadRequestException('Email no registrado en la lista de funcionarios.');
+    }
+
+    const userResult = existingUser;
 
     const user = userResult.rows[0];
     const otp = randomInt(100000, 1000000).toString();

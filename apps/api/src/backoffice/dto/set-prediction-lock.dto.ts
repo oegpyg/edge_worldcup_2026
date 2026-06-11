@@ -5,4 +5,9 @@ export class SetPredictionLockDto {
   @IsString()
   @MaxLength(40)
   lockAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  stage2LockAt?: string;
 }
