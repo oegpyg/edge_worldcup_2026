@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, ParseIntPipe, Post, Patch } from '@nestjs/common';
 
 import { BackofficeService } from './backoffice.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
@@ -9,6 +9,7 @@ import { DemoResetDto } from './dto/demo-reset.dto';
 import { GenerateDemoMatchesDto } from './dto/generate-demo-matches.dto';
 import { GenerateDemoPredictionsDto } from './dto/generate-demo-predictions.dto';
 import { ImportOfficialsCsvDto } from './dto/import-officials-csv.dto';
+import { UpdateOfficialDto } from './dto/update-official.dto';
 import { SetMatchResultDto } from './dto/set-match-result.dto';
 import { SetPredictionLockDto } from './dto/set-prediction-lock.dto';
 
@@ -52,6 +53,15 @@ export class BackofficeController {
     @Body() body: ImportOfficialsCsvDto,
   ) {
     return this.backofficeService.importOfficialsFromCsv(adminToken, body.csvContent, body.clearPreviousData);
+  }
+
+  @Patch('officials/:id')
+  updateOfficial(
+    @Headers('x-admin-token') adminToken: string | undefined,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateOfficialDto,
+  ) {
+    return this.backofficeService.updateOfficial(id, body.fullName, body.sex, adminToken);
   }
 
   @Get('prediction-lock')

@@ -20,6 +20,8 @@ type OfficialStatus = {
   status: 'pendiente' | 'incompleta' | 'completa';
 };
 
+type EditingOfficialId = number | null;
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const ADMIN_TOKEN_KEY = 'edge-backoffice-admin-token';
 
@@ -31,6 +33,9 @@ export default function BackofficeOfficialsPage() {
   const [adminToken, setAdminToken] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [clearPreviousData, setClearPreviousData] = useState(false);
+  const [editingId, setEditingId] = useState<EditingOfficialId>(null);
+  const [editingFullName, setEditingFullName] = useState('');
+  const [editingSex, setEditingSex] = useState<'male' | 'female' | ''>('');
 
   useEffect(() => {
     const token = window.localStorage.getItem(ADMIN_TOKEN_KEY);
@@ -129,6 +134,59 @@ export default function BackofficeOfficialsPage() {
     }
   }
 
+  function startEditing(official: OfficialStatus) {
+    setEditingId(official.id);
+    setEditingFullName(official.fullName ?? '');
+    setEditingSex((official.sex ?? '') as 'male' | 'female' | '');
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setEditingFullName('');
+    setEditingSex('');
+  }
+
+  async function saveOfficialEdit(officialId: number) {
+    if (!adminToken) {
+      return;
+    }
+
+    try {
+      setIsBusy(true);
+      const response = await fetch(`${API_URL}/backoffice/officials/${officialId}`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          'x-admin-token': adminToken,
+        },
+        body: JSON.stringify({
+          fullName: editingFullName || undefined,
+          sex: editingSex || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+          router.replace('/backoffice/login');
+          return;
+        }
+
+        const errorPayload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(errorPayload?.message ?? 'No se pudo actualizar el funcionario.');
+      }
+
+      setNotice('Funcionario actualizado correctamente.');
+      cancelEditing();
+      await loadOfficials();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo actualizar el funcionario.';
+      setNotice(message);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   return (
     <main className="backoffice-shell">
       <section className="backoffice-head">
@@ -196,27 +254,87 @@ export default function BackofficeOfficialsPage() {
               </tr>
             </thead>
             <tbody>
-              {officials.map((official) => (
-                <tr key={official.id}>
-                  <td>
-                    <strong>{official.email}</strong>
-                    {official.fullName ? <span>Nombre: {official.fullName}</span> : null}
-                    <span>Alta: {new Date(official.createdAt).toLocaleString()}</span>
-                  </td>
-                  <td>{official.sex === 'female' ? 'female' : official.sex === 'male' ? 'male' : '-'}</td>
-                  <td>
-                    <span className={`status-chip status-chip-${official.status}`}>{official.status}</span>
-                  </td>
-                  <td>{official.points}</td>
-                  <td>
-                    {official.qualifiedCount}/32 clasificados · {official.finalistCount}/2 finalistas
-                  </td>
-                  <td>{official.championCode ?? '-'}</td>
-                  <td>
-                    {official.predictionUpdatedAt ? new Date(official.predictionUpdatedAt).toLocaleString() : 'Sin carga'}
-                  </td>
-                </tr>
-              ))}
+              {officials.map((official) => {
+                const isEditing = editingId === official.id;
+                return (
+                  <tr key={official.id} style={{ backgroundColor: isEditing ? 'rgba(52, 211, 153, 0.1)' : undefined }}>
+                    <td>
+                      <strong>{official.email}</strong>
+                      {isEditing ? (
+                        <div className="edit-field">
+                          <input
+                            className="input"
+                            type="text"
+                            placeholder="Nombre completo"
+                            value={editingFullName}
+                            onChange={(e) => setEditingFullName(e.target.value)}
+                            disabled={isBusy}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          {official.fullName ? <span>Nombre: {official.fullName}</span> : <span>Sin nombre</span>}
+                          <span>Alta: {new Date(official.createdAt).toLocaleString()}</span>
+                        </>
+                      )}
+                    </td>
+                    <td>
+                      {isEditing ? (
+                        <div className="edit-field">
+                          <select
+                            className="input"
+                            value={editingSex}
+                            onChange={(e) => setEditingSex(e.target.value as 'male' | 'female' | '')}
+                            disabled={isBusy}
+                          >
+                            <option value="">No especificado</option>
+                            <option value="male">male</option>
+                            <option value="female">female</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <>{official.sex === 'female' ? 'female' : official.sex === 'male' ? 'male' : '-'}</>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`status-chip status-chip-${official.status}`}>{official.status}</span>
+                    </td>
+                    <td>{official.points}</td>
+                    <td>
+                      {official.qualifiedCount}/32 clasificados · {official.finalistCount}/2 finalistas
+                    </td>
+                    <td>{official.championCode ?? '-'}</td>
+                    <td>
+                      {isEditing ? (
+                        <div className="edit-actions">
+                          <button
+                            className="button button-small button-primary"
+                            onClick={() => void saveOfficialEdit(official.id)}
+                            disabled={isBusy}
+                          >
+                            Guardar
+                          </button>
+                          <button className="button button-small button-secondary" onClick={() => cancelEditing()} disabled={isBusy}>
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          {official.predictionUpdatedAt ? new Date(official.predictionUpdatedAt).toLocaleString() : 'Sin carga'}
+                          <button
+                            className="button button-small button-secondary"
+                            style={{ marginLeft: '8px' }}
+                            onClick={() => startEditing(official)}
+                            disabled={isBusy}
+                          >
+                            Editar
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

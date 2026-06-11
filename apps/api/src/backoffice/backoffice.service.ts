@@ -375,6 +375,56 @@ export class BackofficeService {
     });
   }
 
+  async updateOfficial(
+    officialId: number,
+    fullName?: string,
+    sex?: string,
+    adminToken?: string,
+  ) {
+    this.assertAdminToken(adminToken);
+
+    if (!fullName && !sex) {
+      throw new BadRequestException('Debe proporcionar al menos un campo para actualizar.');
+    }
+
+    if (sex && sex !== 'male' && sex !== 'female') {
+      throw new BadRequestException('El sexo debe ser "male" o "female".');
+    }
+
+    const updates: string[] = [];
+    const values: (string | number)[] = [];
+    let paramIndex = 1;
+
+    if (fullName !== undefined) {
+      updates.push(`full_name = $${paramIndex}`);
+      values.push(fullName);
+      paramIndex++;
+    }
+
+    if (sex !== undefined) {
+      updates.push(`sex = $${paramIndex}`);
+      values.push(sex);
+      paramIndex++;
+    }
+
+    values.push(officialId);
+
+    const query = `
+      UPDATE users
+      SET ${updates.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING id, email, full_name, sex;
+    `;
+
+    const result = await this.databaseService.query(query, values);
+
+    if (result.rows.length === 0) {
+      throw new NotFoundException('Funcionario no encontrado.');
+    }
+
+    return result.rows[0];
+  }
+
   async getPredictionLock(adminToken?: string) {
     this.assertAdminToken(adminToken);
 

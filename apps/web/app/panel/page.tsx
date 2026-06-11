@@ -22,55 +22,55 @@ type Prediction = {
 
 type PredictionStage = 'stage1' | 'stage2' | 'readonly';
 
-const FLAG_BY_CODE: Record<string, string> = {
-  CAN: '🇨🇦',
-  MEX: '🇲🇽',
-  USA: '🇺🇸',
-  CUW: '🇨🇼',
-  HAI: '🇭🇹',
-  PAN: '🇵🇦',
-  ARG: '🇦🇷',
-  BRA: '🇧🇷',
-  COL: '🇨🇴',
-  ECU: '🇪🇨',
-  PAR: '🇵🇾',
-  URU: '🇺🇾',
-  AUS: '🇦🇺',
-  IRN: '🇮🇷',
-  JPN: '🇯🇵',
-  JOR: '🇯🇴',
-  KOR: '🇰🇷',
-  QAT: '🇶🇦',
-  KSA: '🇸🇦',
-  UZB: '🇺🇿',
-  IRQ: '🇮🇶',
-  ALG: '🇩🇿',
-  CPV: '🇨🇻',
-  CIV: '🇨🇮',
-  EGY: '🇪🇬',
-  GHA: '🇬🇭',
-  MAR: '🇲🇦',
-  SEN: '🇸🇳',
-  RSA: '🇿🇦',
-  TUN: '🇹🇳',
-  COD: '🇨🇩',
-  NZL: '🇳🇿',
-  AUT: '🇦🇹',
-  BEL: '🇧🇪',
-  BIH: '🇧🇦',
-  CRO: '🇭🇷',
-  CZE: '🇨🇿',
-  ENG: '🏴',
-  FRA: '🇫🇷',
-  GER: '🇩🇪',
-  NED: '🇳🇱',
-  POR: '🇵🇹',
-  NOR: '🇳🇴',
-  SCO: '🏴',
-  ESP: '🇪🇸',
-  SWE: '🇸🇪',
-  SUI: '🇨🇭',
-  TUR: '🇹🇷',
+const FLAG_IMG_BY_CODE: Record<string, string> = {
+  CAN: '/flags/canada.jpg',
+  MEX: '/flags/mexico.jpg',
+  USA: '/flags/estadosunidos.jpg',
+  CUW: '/flags/curazao.jpg',
+  HAI: '/flags/haiti.jpg',
+  PAN: '/flags/panama.jpg',
+  ARG: '/flags/argentina.jpg',
+  BRA: '/flags/brasil.jpg',
+  COL: '/flags/colombia.jpg',
+  ECU: '/flags/ecuador.jpg',
+  PAR: '/flags/paraguay.jpg',
+  URU: '/flags/uruguay.jpg',
+  AUS: '/flags/australia.jpg',
+  IRN: '/flags/iran.jpg',
+  JPN: '/flags/japon.jpg',
+  JOR: '/flags/jordania.jpg',
+  KOR: '/flags/coreadelsur.jpg',
+  QAT: '/flags/qatar.jpg',
+  KSA: '/flags/arabiasaudita.jpg',
+  UZB: '/flags/uzbekistan.jpg',
+  IRQ: '/flags/irak.jpg',
+  ALG: '/flags/argelia.jpg',
+  CPV: '/flags/caboverde.jpg',
+  CIV: '/flags/costademarfil.jpg',
+  EGY: '/flags/egipto.jpg',
+  GHA: '/flags/ghana.jpg',
+  MAR: '/flags/marruecos.jpg',
+  SEN: '/flags/senegal.jpg',
+  RSA: '/flags/sudafrica.jpg',
+  TUN: '/flags/tunez.jpg',
+  COD: '/flags/rdcongo.jpg',
+  NZL: '/flags/nuevazelanda.jpg',
+  AUT: '/flags/austria.jpg',
+  BEL: '/flags/belgica.jpg',
+  BIH: '/flags/bosniayherzegovina.jpg',
+  CRO: '/flags/croacia.jpg',
+  CZE: '/flags/republicacheca.jpg',
+  ENG: '/flags/inglaterra.jpg',
+  FRA: '/flags/francia.jpg',
+  GER: '/flags/alemania.jpg',
+  NED: '/flags/paisesbajos.jpg',
+  POR: '/flags/portugal.jpg',
+  NOR: '/flags/noruega.jpg',
+  SCO: '/flags/escocia.jpg',
+  ESP: '/flags/espana.jpg',
+  SWE: '/flags/suecia.jpg',
+  SUI: '/flags/suiza.jpg',
+  TUR: '/flags/turquia.jpg',
 };
 
 export default function UserPanelPage() {
@@ -128,8 +128,8 @@ export default function UserPanelPage() {
     return new Map(countries.map((country) => [country.code, country]));
   }, [countries]);
 
-  function getFlag(code: string) {
-    return FLAG_BY_CODE[code] ?? '🏳️';
+  function getFlagImg(code: string) {
+    return FLAG_IMG_BY_CODE[code] ?? null;
   }
 
   async function loadPanel(token: string) {
@@ -329,8 +329,10 @@ export default function UserPanelPage() {
 
       <form className="user-panel-grid" onSubmit={savePrediction}>
         <section className="panel user-panel-card user-panel-card-bottom">
-          <h2>Clasificados a siguiente ronda</h2>
-          <p>{qualifiedCodes.length}/32 seleccionados</p>
+          <div className="panel-card-header">
+            <h2>Clasificados a siguiente ronda</h2>
+            <p>{qualifiedCodes.length}/32 seleccionados</p>
+          </div>
           {!isStage1 ? <p className="small">Etapa 1 cerrada. Los 32 clasificados quedan en solo lectura.</p> : null}
           <div className="country-groups">
             {groupedCountries.map((group) => {
@@ -364,7 +366,12 @@ export default function UserPanelPage() {
                             onChange={() => toggleQualified(country.code)}
                             disabled={isDisabled}
                           />
-                          <span className="country-flag" aria-hidden="true">{getFlag(country.code)}</span>
+                          <span className="country-flag" aria-hidden="true">
+                            {getFlagImg(country.code) ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={getFlagImg(country.code)!} alt="" className="country-flag-img" />
+                            ) : null}
+                          </span>
                           <span className="country-name">{country.name}</span>
                           <small className="country-code">{country.code}</small>
                         </label>
@@ -392,7 +399,7 @@ export default function UserPanelPage() {
                 <option value="">Selecciona</option>
                 {finalistOptions.map((country) => (
                   <option key={`f1-${country.code}`} value={country.code}>
-                    {getFlag(country.code)} {country.name} ({country.code})
+                    {country.name} ({country.code})
                   </option>
                 ))}
               </select>
@@ -409,7 +416,7 @@ export default function UserPanelPage() {
                 <option value="">Selecciona</option>
                 {finalistOptions.map((country) => (
                   <option key={`f2-${country.code}`} value={country.code}>
-                    {getFlag(country.code)} {country.name} ({country.code})
+                    {country.name} ({country.code})
                   </option>
                 ))}
               </select>
@@ -428,7 +435,7 @@ export default function UserPanelPage() {
                   .filter((country) => finalistCodes.includes(country.code))
                   .map((country) => (
                     <option key={`champ-${country.code}`} value={country.code}>
-                      {getFlag(country.code)} {country.name} ({country.code})
+                      {country.name} ({country.code})
                     </option>
                   ))}
               </select>
