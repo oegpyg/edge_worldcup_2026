@@ -8,6 +8,7 @@ import { DemoDistributionDto } from './dto/demo-distribution.dto';
 import { DemoResetDto } from './dto/demo-reset.dto';
 import { GenerateDemoMatchesDto } from './dto/generate-demo-matches.dto';
 import { GenerateDemoPredictionsDto } from './dto/generate-demo-predictions.dto';
+import { ImportMatchesCsvDto } from './dto/import-matches-csv.dto';
 import { ImportOfficialsCsvDto } from './dto/import-officials-csv.dto';
 import { UpdateOfficialDto } from './dto/update-official.dto';
 import { SetMatchResultDto } from './dto/set-match-result.dto';
@@ -40,6 +41,14 @@ export class BackofficeController {
   @Get('matches')
   listMatches(@Headers('x-admin-token') adminToken?: string) {
     return this.backofficeService.listMatches(adminToken);
+  }
+
+  @Post('matches/import-csv')
+  importMatchesFromCsv(
+    @Headers('x-admin-token') adminToken: string | undefined,
+    @Body() body: ImportMatchesCsvDto,
+  ) {
+    return this.backofficeService.importMatchesFromCsv(adminToken, body.csvContent, body.clearPreviousMatches);
   }
 
   @Get('officials')

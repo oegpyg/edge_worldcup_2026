@@ -982,6 +982,112 @@ export class BackofficeService {
     }
   }
 
+  async importMatchesFromCsv(
+    adminToken: string | undefined,
+    csvContent: string,
+    clearPreviousMatches = false,
+  ) {
+    this.assertAdminToken(adminToken);
+
+    const parsed = this.parseMatchesCsv(csvContent);
+
+    if (clearPreviousMatches) {
+      await this.databaseService.query('DELETE FROM wc_matches;');
+    }
+
+    let created = 0;
+    let skipped = 0;
+
+    for (const row of parsed.rows) {
+      const codeResult = await this.databaseService.query<{ id: number; code: string }>(
+        `
+          SELECT id, code
+          FROM wc_countries
+          WHERE code IN ($1, $2);
+        `,
+        [row.homeCode, row.awayCode],
+      );
+
+      const home = codeResult.rows.find((item) => item.code === row.homeCode);
+      const away = codeResult.rows.find((item) => item.code === row.awayCode);
+
+      if (!home || !away) {
+        skipped++;
+        continue;
+      }
+
+      await this.databaseService.query(
+        `
+          INSERT INTO wc_matches (home_country_id, away_country_id, kickoff, stage, venue)
+          VALUES ($1, $2, $3::timestamptz, $4, $5);
+        `,
+        [home.id, away.id, row.kickoff, row.stage, row.venue],
+      );
+      created++;
+    }
+
+    return {
+      created,
+      skipped,
+      invalidRows: parsed.invalidRows,
+      processedRows: parsed.processedRows,
+      clearPreviousMatches,
+    };
+  }
+
+  private parseMatchesCsv(csvContent: string) {
+    const normalized = csvContent.replace(/^\uFEFF/, '');
+    const lines = normalized
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+    if (lines.length === 0) {
+      return { processedRows: 0, invalidRows: 0, rows: [] as Array<{ homeCode: string; awayCode: string; kickoff: string; stage: string; venue: string }> };
+    }
+
+    const header = this.splitCsvLine(lines[0]).map((col) => col.toLowerCase().replace(/[^a-z]/g, ''));
+    const dataLines = lines.slice(1);
+
+    const homeIdx = header.findIndex((col) => ['home', 'local', 'homecode', 'equipolocal'].includes(col));
+    const awayIdx = header.findIndex((col) => ['away', 'visita', 'awaycode', 'equipovisita'].includes(col));
+    const kickoffIdx = header.findIndex((col) => ['kickoff', 'fecha', 'date', 'datetime', 'hora'].includes(col));
+    const stageIdx = header.findIndex((col) => ['stage', 'etapa', 'fase', 'ronda'].includes(col));
+    const venueIdx = header.findIndex((col) => ['venue', 'estadio', 'sede'].includes(col));
+
+    const rows: Array<{ homeCode: string; awayCode: string; kickoff: string; stage: string; venue: string }> = [];
+    let invalidRows = 0;
+
+    for (const line of dataLines) {
+      const cols = this.splitCsvLine(line);
+      const homeCode = (homeIdx >= 0 ? cols[homeIdx] : cols[0] ?? '').trim().toUpperCase();
+      const awayCode = (awayIdx >= 0 ? cols[awayIdx] : cols[1] ?? '').trim().toUpperCase();
+      const kickoffRaw = (kickoffIdx >= 0 ? cols[kickoffIdx] : cols[2] ?? '').trim();
+      const stage = (stageIdx >= 0 ? cols[stageIdx] : cols[3] ?? 'Grupos').trim() || 'Grupos';
+      const venue = (venueIdx >= 0 ? cols[venueIdx] : cols[4] ?? '').trim() || 'Por confirmar';
+
+      if (!homeCode || !awayCode || homeCode === awayCode || !kickoffRaw) {
+        invalidRows++;
+        continue;
+      }
+
+      if (!/^[A-Z]{3}$/.test(homeCode) || !/^[A-Z]{3}$/.test(awayCode)) {
+        invalidRows++;
+        continue;
+      }
+
+      const kickoff = new Date(kickoffRaw);
+      if (isNaN(kickoff.getTime())) {
+        invalidRows++;
+        continue;
+      }
+
+      rows.push({ homeCode, awayCode, kickoff: kickoff.toISOString(), stage, venue });
+    }
+
+    return { processedRows: dataLines.length, invalidRows, rows };
+  }
+
   private parseOfficialsCsv(csvContent: string) {
     const normalized = csvContent.replace(/^\uFEFF/, '');
     const lines = normalized

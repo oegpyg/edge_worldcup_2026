@@ -905,6 +905,24 @@ input {
   margin: 14px 0 8px;
 }
 
+.import-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.import-section h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+
+.import-section code {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
 .backoffice-card-full {
   grid-column: 1 / -1;
 }

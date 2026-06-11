@@ -63,6 +63,8 @@ export default function BackofficePage() {
   const [isBusy, setIsBusy] = useState(false);
   const [adminToken, setAdminToken] = useState('');
   const [resultDrafts, setResultDrafts] = useState<Record<number, MatchResultDraft>>({});
+  const [matchCsvFile, setMatchCsvFile] = useState<File | null>(null);
+  const [clearPreviousMatches, setClearPreviousMatches] = useState(false);
 
   useEffect(() => {
     const token = window.localStorage.getItem(ADMIN_TOKEN_KEY);
@@ -356,6 +358,57 @@ export default function BackofficePage() {
     })();
   }
 
+  async function importMatchesCsv() {
+    if (!adminToken || !matchCsvFile) {
+      setNotice('Selecciona un archivo CSV de partidos para importar.');
+      return;
+    }
+
+    try {
+      setIsBusy(true);
+      const csvContent = await matchCsvFile.text();
+      const response = await fetch(`${API_URL}/backoffice/matches/import-csv`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-admin-token': adminToken,
+        },
+        body: JSON.stringify({ csvContent, clearPreviousMatches }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+          router.replace('/backoffice/login');
+          return;
+        }
+
+        const errorPayload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(errorPayload?.message ?? 'No se pudo importar los partidos.');
+      }
+
+      const payload = (await response.json()) as {
+        created: number;
+        skipped: number;
+        invalidRows: number;
+        processedRows: number;
+        clearPreviousMatches: boolean;
+      };
+
+      setNotice(
+        `Import OK: ${payload.created} partidos creados, ${payload.skipped} paises no encontrados, ${payload.invalidRows} filas invalidas${payload.clearPreviousMatches ? ', partidos anteriores eliminados' : ''}.`,
+      );
+      setMatchCsvFile(null);
+      setClearPreviousMatches(false);
+      await loadData(adminToken);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo importar los partidos.';
+      setNotice(message);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   return (
     <main className="backoffice-shell">
       <section className="backoffice-head">
@@ -549,6 +602,39 @@ export default function BackofficePage() {
               Agregar partido
             </button>
           </form>
+
+          <div className="import-section">
+            <h3>Importar partidos desde CSV</h3>
+            <p className="small">
+              Columnas esperadas: <code>home</code> (o <code>local</code>), <code>away</code> (o <code>visita</code>),
+              {' '}<code>kickoff</code> (o <code>fecha</code>), <code>stage</code> (o <code>etapa</code>),
+              {' '}<code>venue</code> (o <code>estadio</code>). Los codigos de pais deben existir previamente.
+            </p>
+            <div className="import-row">
+              <input
+                className="input"
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(event) => setMatchCsvFile(event.target.files?.[0] ?? null)}
+              />
+              <button
+                className="button button-primary"
+                type="button"
+                onClick={() => void importMatchesCsv()}
+                disabled={isBusy || !matchCsvFile}
+              >
+                Importar CSV
+              </button>
+            </div>
+            <label className="small import-flag">
+              <input
+                type="checkbox"
+                checked={clearPreviousMatches}
+                onChange={(event) => setClearPreviousMatches(event.target.checked)}
+              />
+              Eliminar partidos anteriores antes de importar
+            </label>
+          </div>
 
           <div className="table-wrap">
             <table className="admin-table">
