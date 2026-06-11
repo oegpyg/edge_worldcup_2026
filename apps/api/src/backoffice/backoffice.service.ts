@@ -344,6 +344,7 @@ export class BackofficeService {
           up.champion_code
         FROM users u
         LEFT JOIN user_predictions up ON up.user_id = u.id
+        WHERE u.is_official = true
         ORDER BY u.created_at DESC;
       `,
     );
@@ -423,6 +424,25 @@ export class BackofficeService {
     }
 
     return result.rows[0];
+  }
+
+  async markAllUsersAsOfficials(adminToken?: string) {
+    this.assertAdminToken(adminToken);
+
+    const result = await this.databaseService.query<{ id: number }>(
+      `
+        UPDATE users
+        SET is_official = true
+        WHERE is_official = false
+        RETURNING id;
+      `,
+    );
+
+    return {
+      success: true,
+      updatedUsers: result.rowCount ?? 0,
+      message: 'Todos los usuarios fueron marcados como funcionarios.',
+    };
   }
 
   async getPredictionLock(adminToken?: string) {

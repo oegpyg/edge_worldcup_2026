@@ -49,8 +49,12 @@ export class AuthService {
       [normalizedEmail],
     );
 
-    if (existingUser.rows.length === 0 || !existingUser.rows[0].is_official) {
+    if (existingUser.rows.length === 0) {
       throw new BadRequestException('Email no registrado en la lista de funcionarios.');
+    }
+
+    if (!existingUser.rows[0].is_official) {
+      throw new BadRequestException('El email existe, pero no esta marcado como funcionario (is_official=false).');
     }
 
     const userResult = existingUser;

@@ -73,6 +73,11 @@ export class BackofficeController {
     return this.backofficeService.updateOfficial(id, body.fullName, body.sex, adminToken);
   }
 
+  @Post('officials/mark-all')
+  markAllUsersAsOfficials(@Headers('x-admin-token') adminToken?: string) {
+    return this.backofficeService.markAllUsersAsOfficials(adminToken);
+  }
+
   @Get('prediction-lock')
   getPredictionLock(@Headers('x-admin-token') adminToken?: string) {
     return this.backofficeService.getPredictionLock(adminToken);

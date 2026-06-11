@@ -900,7 +900,7 @@ input {
 
 .import-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 10px;
   margin: 14px 0 8px;
 }

@@ -187,6 +187,42 @@ export default function BackofficeOfficialsPage() {
     }
   }
 
+  async function markAllUsersAsOfficials() {
+    if (!adminToken) {
+      return;
+    }
+
+    try {
+      setIsBusy(true);
+      const response = await fetch(`${API_URL}/backoffice/officials/mark-all`, {
+        method: 'POST',
+        headers: {
+          'x-admin-token': adminToken,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+          router.replace('/backoffice/login');
+          return;
+        }
+
+        const errorPayload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(errorPayload?.message ?? 'No se pudo marcar usuarios como funcionarios.');
+      }
+
+      const payload = (await response.json()) as { updatedUsers: number };
+      setNotice(`Actualizacion OK: ${payload.updatedUsers} usuarios marcados como funcionarios.`);
+      await loadOfficials();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo marcar usuarios como funcionarios.';
+      setNotice(message);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   return (
     <main className="backoffice-shell">
       <section className="backoffice-head">
@@ -228,6 +264,14 @@ export default function BackofficeOfficialsPage() {
           />
           <button className="button button-primary" type="button" onClick={() => void importOfficialsCsv()} disabled={isBusy}>
             Importar CSV
+          </button>
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => void markAllUsersAsOfficials()}
+            disabled={isBusy}
+          >
+            Marcar todos como funcionarios
           </button>
         </div>
         <label className="small import-flag">
